@@ -4,7 +4,6 @@ plugins {
     id 'idea'
     id 'dev.kikugie.stonecutter'
     id 'net.neoforged.moddev'
-    id 'org.jetbrains.kotlin.jvm'
 }
 
 version = mod_version
@@ -17,18 +16,43 @@ if (minecraft_version != stonecutter.current.version) {
 repositories {
     mavenCentral()
     maven {
-        name = 'Kotlin for Forge'
-        url = 'https://thedarkcolour.github.io/KotlinForForge/'
-        content { includeGroup 'thedarkcolour' }
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+    maven {
+        name = 'JEI'
+        url = 'https://maven.blamejared.com/'
+        content { includeGroup 'mezz.jei' }
+    }
+    maven {
+        name = 'Shedaniel'
+        url = 'https://maven.shedaniel.me/'
+        content { includeGroup 'me.shedaniel.cloth' }
+    }
+    maven {
+        name = 'Architectury'
+        url = 'https://maven.architectury.dev/'
+        content { includeGroup 'dev.architectury' }
     }
 }
 
 base {
-    archivesName = "${mod_name}-${minecraft_version}-neoforge"
+    archivesName = "${mod_id}-${minecraft_version}-neoforge"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version as int)
-kotlin.jvmToolchain(java_version as int)
+
+sourceSets {
+    gameTest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+        resources.setSrcDirs([rootProject.file('src/gameTest/resources')])
+        java.setSrcDirs([rootProject.file('src/gameTest/java')])
+    }
+}
+configurations.gameTestImplementation.extendsFrom configurations.implementation
+configurations.gameTestRuntimeOnly.extendsFrom configurations.runtimeOnly
 
 neoForge {
     version = project.neo_version
@@ -36,6 +60,16 @@ neoForge {
     parchment {
         mappingsVersion = project.parchment_mappings_version
         minecraftVersion = project.parchment_minecraft_version
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+        integrationGameTest {
+            sourceSet(sourceSets.main)
+            sourceSet(sourceSets.gameTest)
+        }
     }
 
     runs {
@@ -60,23 +94,50 @@ neoForge {
                 rootProject.file('src/main/resources').absolutePath
         }
         configureEach {
+            loadedMods = [neoForge.mods.getByName(project.mod_id)]
+            if (name == 'gameTestServer') {
+                loadedMods = [neoForge.mods.getByName('integrationGameTest')]
+                sourceSet = sourceSets.gameTest
+            }
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
         }
     }
 
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-        }
-    }
 }
+
+neoForge.addModdingDependenciesTo(sourceSets.gameTest)
+tasks.named('check') { dependsOn tasks.named('gameTestClasses') }
 
 sourceSets.main.resources.srcDirs rootProject.file('src/generated/resources'), layout.projectDirectory.dir('src/generated/resources')
 
 dependencies {
-    implementation "thedarkcolour:kotlinforforge-neoforge:${kotlin_for_forge_version}"
+    implementation "maven.modrinth:toms-storage:${toms_storage_version}"
+    implementation "maven.modrinth:sophisticated-backpacks:${sophisticated_backpacks_version}"
+    implementation "maven.modrinth:sophisticated-core:${sophisticated_core_version}"
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
+    compileOnly "maven.modrinth:emi:${emi_version}"
+    compileOnly "maven.modrinth:rei:${rei_version}"
+
+    def viewer = providers.gradleProperty('recipeViewer').orElse('jei').get()
+    switch (viewer) {
+        case 'jei':
+            runtimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
+            break
+        case 'emi':
+            runtimeOnly "maven.modrinth:emi:${emi_version}"
+            break
+        case 'rei':
+            runtimeOnly "maven.modrinth:rei:${rei_version}"
+            runtimeOnly "me.shedaniel.cloth:cloth-config-neoforge:${cloth_config_version}"
+            runtimeOnly "dev.architectury:architectury-neoforge:${architectury_version}"
+            break
+        case 'none':
+            break
+        default:
+            throw new GradleException("Unknown recipeViewer '${viewer}'; use jei, emi, rei, or none")
+    }
 }
 
 def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

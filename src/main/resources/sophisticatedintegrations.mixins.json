@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "org.kvxd.sophisticatedintegrations.mixin",
+  "plugin": "org.kvxd.sophisticatedintegrations.mixin.IntegrationMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "StorageTerminalMenuMixin",
+    "CraftingTerminalMenuMixin",
+    "StorageTerminalBlockEntityMixin",
+    "CraftingTerminalBlockEntityMixin",
+    "TerminalCraftingFillerMixin",
+    "BackpackCraftingMenuMixin",
+    "BackpackRecipeFillerMixin",
+    "BackpackCraftingRefillMixin"
+  ],
+  "client": [
+    "client.BackpackJeiTransferMixin",
+    "client.BackpackEmiTransferMixin",
+    "client.BackpackReiTransferMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

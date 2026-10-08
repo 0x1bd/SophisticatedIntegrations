@@ -10,10 +10,10 @@ plugins {
     id 'dev.kikugie.stonecutter' version '0.9.8'
 }
 
-rootProject.name = 'KVXStorage'
+rootProject.name = 'SophisticatedIntegrations'
 
 stonecutter {
-    kotlinController = true
+    kotlinController = false
     centralScript = 'build.gradle'
     create(rootProject) {
         versions('1.21.1')

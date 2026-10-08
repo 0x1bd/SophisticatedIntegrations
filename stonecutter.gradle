@@ -1,0 +1,29 @@
+plugins {
+    id 'dev.kikugie.stonecutter'
+    id 'net.neoforged.moddev' version '2.0.148' apply false
+}
+
+stonecutter.active '1.21.1'
+
+tasks.register('build') {
+    group = 'build'
+    description = 'Builds Sophisticated Integrations for every registered Minecraft version.'
+    dependsOn(subprojects.collect { "${it.path}:build" })
+}
+
+tasks.register('buildAll') {
+    group = 'build'
+    description = 'Builds every Minecraft version from the shared sources.'
+    dependsOn('build')
+}
+
+tasks.register('clean', Delete) {
+    group = 'build'
+    delete(layout.buildDirectory)
+    dependsOn(subprojects.collect { "${it.path}:clean" })
+}
+
+tasks.register('check') {
+    group = 'verification'
+    dependsOn(subprojects.collect { "${it.path}:check" })
+}
