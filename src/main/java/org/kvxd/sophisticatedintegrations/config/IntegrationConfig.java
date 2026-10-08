@@ -13,7 +13,7 @@ public final class IntegrationConfig {
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.push("terminal");
-        ENABLED = builder.comment("Include the viewing player's carried and equipped Sophisticated Backpacks in Tom's terminals.")
+        ENABLED = builder.comment("Allow players to include carried and equipped Sophisticated Backpacks using the terminal toggle (off by default).")
                 .define("includeBackpacks", true);
         INSERT_INTO_BACKPACKS = builder.comment("Insert into backpacks when the storage network cannot accept the remaining items.")
                 .define("insertIntoBackpacks", true);

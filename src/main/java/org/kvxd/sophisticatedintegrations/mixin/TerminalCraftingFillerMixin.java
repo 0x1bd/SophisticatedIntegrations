@@ -22,7 +22,8 @@ public abstract class TerminalCraftingFillerMixin {
             target = "Lcom/tom/storagemod/util/TerminalSyncManager;fillCraftingFiller(Lcom/tom/storagemod/menu/TerminalCraftingFiller;)V",
             shift = At.Shift.AFTER))
     private void sophisticatedIntegrations$freshIngredients(Recipe<?> recipe, CallbackInfo callback) {
-        if (player.containerMenu instanceof IntegrationMenu menu && menu.sophisticatedIntegrations$getSession().canAccess()) {
+        if (player.containerMenu instanceof IntegrationMenu menu && menu.sophisticatedIntegrations$getSession().canAccess()
+                && menu.sophisticatedIntegrations$getSession().includesBackpacks()) {
             BackpackInventories.snapshot(player).values().forEach(value -> accountStack(value.getStack()));
         }
     }

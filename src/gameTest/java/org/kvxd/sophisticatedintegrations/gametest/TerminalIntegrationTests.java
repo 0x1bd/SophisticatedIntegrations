@@ -68,6 +68,7 @@ public final class TerminalIntegrationTests {
                 ? new CraftingTerminalMenu(1, player.getInventory(), crafting)
                 : new StorageTerminalMenu(1, player.getInventory(), terminal);
         player.containerMenu = menu;
+        session(menu).setIncludesBackpacks(true);
         return menu;
     }
 
@@ -99,6 +100,93 @@ public final class TerminalIntegrationTests {
         }
         return client.getAsList().stream().filter(s -> ItemStack.isSameItemSameComponents(s.getStack(), template))
                 .mapToLong(StoredItemStack::getQuantity).sum();
+    }
+
+    @GameTest(template = "empty")
+    public static void initialSyncIncludesBackpacksAfterMenuOpens(GameTestHelper helper) {
+        var terminal = terminal(helper, false);
+        ((Container) helper.getBlockEntity(BARREL)).setItem(0, new ItemStack(Items.COPPER_INGOT, 20));
+        terminal.getStacks();
+        terminal.updateServer();
+        var player = player(helper);
+        backpack(player).getInventoryHandler().setStackInSlot(0, new ItemStack(Items.COPPER_INGOT, 7));
+        var preferences = new CompoundTag();
+        preferences.putBoolean(TerminalSession.BACKPACKS_SETTING, true);
+        player.getPersistentData().put(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG, preferences);
+        var menu = new StorageTerminalMenu(1, player.getInventory(), terminal);
+        menu.broadcastChanges();
+        helper.assertTrue(((TestPlayerConnection) player.connection).packets().isEmpty(),
+                "An unopened terminal must not send a network-only item list before the combined view");
+        player.containerMenu = menu;
+        menu.broadcastChanges();
+        helper.assertTrue(clientQuantity(player, new ItemStack(Items.COPPER_INGOT)) == 27,
+                "Opening must synchronize backpack items after the initial network-only packet; received="
+                        + clientQuantity(player, new ItemStack(Items.COPPER_INGOT)));
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void backpackToggleDefaultsOffAndRemembersPerPlayer(GameTestHelper helper) {
+        var terminal = terminal(helper, false);
+        var player = player(helper);
+        var other = player(helper);
+        backpack(player).getInventoryHandler().setStackInSlot(0, new ItemStack(Items.DIAMOND, 3));
+        var menu = new StorageTerminalMenu(1, player.getInventory(), terminal);
+        player.containerMenu = menu;
+        helper.assertTrue(!session(menu).includesBackpacks() && quantity(view(menu, terminal), new ItemStack(Items.DIAMOND)) == 0,
+                "Backpacks must be excluded until the viewer opts in");
+        menu.onInteract(new StoredItemStack(new ItemStack(Items.DIAMOND)), SlotAction.PULL_ONE, false);
+        helper.assertTrue(menu.getCarried().isEmpty(), "A disabled backpack must not be extractable");
+        var message = new CompoundTag();
+        message.putBoolean(TerminalSession.BACKPACKS_SETTING, true);
+        message.putInt("sophisticatedintegrations:menu", 999);
+        menu.receive(message);
+        helper.assertTrue(!session(menu).includesBackpacks(), "A stale menu toggle must be rejected");
+        message.putInt("sophisticatedintegrations:menu", menu.containerId);
+        menu.receive(message);
+        menu.broadcastChanges();
+        helper.assertTrue(clientQuantity(player, new ItemStack(Items.DIAMOND)) == 3,
+                "The native toggle message must synchronize backpack contents");
+        var reopened = new StorageTerminalMenu(2, player.getInventory(), terminal);
+        player.containerMenu = reopened;
+        helper.assertTrue(session(reopened).includesBackpacks(), "The player's preference must survive opening another menu");
+        var otherMenu = new StorageTerminalMenu(1, other.getInventory(), terminal);
+        other.containerMenu = otherMenu;
+        helper.assertTrue(!session(otherMenu).includesBackpacks(), "A toggle must not change another player's terminal view");
+        ((IntegrationMenu) reopened).sophisticatedIntegrations$setIncludesBackpacks(false);
+        reopened.broadcastChanges();
+        helper.assertTrue(quantity(view(reopened, terminal), new ItemStack(Items.DIAMOND)) == 0,
+                "Switching off must remove backpack contents immediately");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 160)
+    public static void idleSyncAndNetworkUpdatesRemainCombined(GameTestHelper helper) {
+        var terminal = terminal(helper, false);
+        var barrel = (Container) helper.getBlockEntity(BARREL);
+        barrel.setItem(0, new ItemStack(Items.COPPER_INGOT, 20));
+        terminal.getStacks();
+        terminal.updateServer();
+        var player = player(helper);
+        backpack(player).getInventoryHandler().setStackInSlot(0, new ItemStack(Items.COPPER_INGOT, 7));
+        var menu = menu(player, terminal);
+        menu.broadcastChanges();
+        var packets = ((TestPlayerConnection) player.connection).packets();
+        int initialPackets = packets.size();
+        helper.runAfterDelay(80, () -> {
+            menu.broadcastChanges();
+            helper.assertTrue(packets.size() == initialPackets, "An idle terminal must not resend its item list");
+            barrel.setItem(0, new ItemStack(Items.COPPER_INGOT, 21));
+            terminal.getStacks();
+            helper.runAfterDelay(2, () -> {
+                terminal.updateServer();
+                menu.broadcastChanges();
+                helper.assertTrue(clientQuantity(player, new ItemStack(Items.COPPER_INGOT)) == 28,
+                        "Network insertion must synchronize the combined count, without an intermediate network-only view");
+                helper.assertTrue(packets.size() == initialPackets + 1, "A network insertion must produce one combined update");
+                helper.succeed();
+            });
+        });
     }
 
     @GameTest(template = "empty")

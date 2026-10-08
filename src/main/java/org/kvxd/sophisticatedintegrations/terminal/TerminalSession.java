@@ -12,6 +12,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public final class TerminalSession {
+    public static final String BACKPACKS_SETTING = "sophisticatedintegrations:include_backpacks";
+    public static final int BACKPACKS_INCLUDED = 1;
+    public static final int BACKPACKS_ALLOWED = 2;
     private final Player player;
     private final StorageTerminalBlockEntity terminal;
     private Map<StoredItemStack, TerminalItemStack> previous;
@@ -34,6 +37,17 @@ public final class TerminalSession {
         return revision;
     }
 
+    public boolean includesBackpacks() {
+        return IntegrationConfig.ENABLED.get() && player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG).getBoolean(BACKPACKS_SETTING);
+    }
+
+    public void setIncludesBackpacks(boolean included) {
+        if (!canAccess()) return;
+        var preferences = player.getPersistentData().getCompound(Player.PERSISTED_NBT_TAG);
+        preferences.putBoolean(BACKPACKS_SETTING, included);
+        player.getPersistentData().put(Player.PERSISTED_NBT_TAG, preferences);
+    }
+
     public boolean canAccess() {
         return terminal != null && !player.level().isClientSide && !player.isSpectator()
                 && player.containerMenu instanceof IntegrationMenu menu && menu.sophisticatedIntegrations$getSession() == this
@@ -47,19 +61,30 @@ public final class TerminalSession {
             copy.setUsedSlotCount(value.getUsedSlotCount());
             combined.put(copy, copy);
         });
-        BackpackInventories.snapshot(player).values().forEach(value -> combined.merge(value, value, TerminalItemStack::merge));
-        if (previous == null || previous.size() != combined.size() || combined.entrySet().stream().anyMatch(entry -> {
+        if (includesBackpacks())
+            BackpackInventories.snapshot(player).values().forEach(value -> combined.merge(value, value, TerminalItemStack::merge));
+        revisionFor(combined);
+        return combined;
+    }
+
+    public int revisionFor(Map<StoredItemStack, TerminalItemStack> items) {
+        if (previous == null || previous.size() != items.size() || items.entrySet().stream().anyMatch(entry -> {
             TerminalItemStack old = previous.get(entry.getKey());
             return old == null || !entry.getValue().equalDetails(old);
         })) {
             revision++;
-            previous = combined;
+            previous = new HashMap<>();
+            items.values().forEach(value -> {
+                TerminalItemStack copy = new TerminalItemStack(value.getStack().copyWithCount(1), value.getQuantity());
+                copy.setUsedSlotCount(value.getUsedSlotCount());
+                previous.put(copy, copy);
+            });
         }
-        return combined;
+        return revision;
     }
 
     public StoredItemStack completeExtraction(StoredItemStack request, long amount, StoredItemStack fromNetwork) {
-        if (request == null || amount <= 0) return fromNetwork;
+        if (!includesBackpacks() || request == null || amount <= 0) return fromNetwork;
         int limit = (int) Math.min(amount, request.getMaxStackSize());
         int alreadyExtracted = fromNetwork == null ? 0 : (int) fromNetwork.getQuantity();
         ItemStack fromBackpacks = BackpackInventories.extract(player, request.getStack(), limit - alreadyExtracted);
@@ -69,7 +94,8 @@ public final class TerminalSession {
     }
 
     public StoredItemStack completeInsertion(StoredItemStack remainder) {
-        if (remainder == null || !IntegrationConfig.INSERT_INTO_BACKPACKS.get()) return remainder;
+        if (!includesBackpacks() || remainder == null || !IntegrationConfig.INSERT_INTO_BACKPACKS.get())
+            return remainder;
         ItemStack uninserted = BackpackInventories.insert(player, remainder.getActualStack());
         return uninserted.isEmpty() ? null : new StoredItemStack(uninserted);
     }

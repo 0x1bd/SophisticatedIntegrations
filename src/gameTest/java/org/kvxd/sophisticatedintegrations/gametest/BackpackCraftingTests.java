@@ -111,6 +111,52 @@ public final class BackpackCraftingTests {
     }
 
     @GameTest(template = "empty")
+    public static void maxTransferChoosesEnoughOfEachVariant(GameTestHelper helper) {
+        var terminal = terminal(helper, 0);
+        var player = player(helper);
+        var menu = menu(player, terminal, 1);
+        player.getInventory().setItem(1, ItemStack.EMPTY);
+        menu.getStorageWrapper().getInventoryHandler().setStackInSlot(1, new ItemStack(Items.BIRCH_PLANKS, 64));
+        BackpackRecipeTransfer.fill(player, 7, ResourceLocation.withDefaultNamespace("chest"), true, 0);
+        int birchLeft = menu.getStorageWrapper().getInventoryHandler().getStackInSlot(1).getCount();
+        helper.assertTrue(gridCount(menu) == 64 && crafting(menu).getRecipeSlots().stream().filter(Slot::hasItem)
+                        .allMatch(slot -> slot.getItem().is(Items.BIRCH_PLANKS) && slot.getItem().getCount() == 8)
+                        && menu.getStorageWrapper().getInventoryHandler().getStackInSlot(0).getCount() == 1 && birchLeft == 0,
+                "One oak plus 64 birch must fill eight chest recipes; grid=" + gridCount(menu) + ", birch left=" + birchLeft);
+        BackpackRecipeTransfer.fill(player, 7, ResourceLocation.withDefaultNamespace("chest"), true, 0);
+        helper.assertTrue(gridCount(menu) == 64 && menu.getStorageWrapper().getInventoryHandler().getStackInSlot(0).getCount() == 1,
+                "Repeated maximum transfer must count existing grid ingredients once and preserve the unused oak");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void maxTransferCanChooseNetworkVariant(GameTestHelper helper) {
+        var terminal = terminal(helper, 64);
+        var player = player(helper);
+        var menu = menu(player, terminal, 0);
+        menu.getStorageWrapper().getInventoryHandler().setStackInSlot(0, new ItemStack(Items.BIRCH_PLANKS, 1));
+        BackpackRecipeTransfer.fill(player, 7, ResourceLocation.withDefaultNamespace("chest"), true, 0);
+        helper.assertTrue(gridCount(menu) == 64 && crafting(menu).getRecipeSlots().stream().filter(Slot::hasItem)
+                        .allMatch(slot -> slot.getItem().is(Items.OAK_PLANKS) && slot.getItem().getCount() == 8)
+                        && menu.getStorageWrapper().getInventoryHandler().getStackInSlot(0).getCount() == 1
+                        && ((Container) helper.getBlockEntity(BARREL)).getItem(0).isEmpty(),
+                "A scarce local variant must not limit the abundant matching network ingredient");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void maxTransferAllowsMixedVariants(GameTestHelper helper) {
+        var terminal = terminal(helper, 0);
+        var player = player(helper);
+        var menu = menu(player, terminal, 4);
+        menu.getStorageWrapper().getInventoryHandler().setStackInSlot(1, new ItemStack(Items.BIRCH_PLANKS, 4));
+        BackpackRecipeTransfer.fill(player, 7, ResourceLocation.withDefaultNamespace("chest"), true, 0);
+        helper.assertTrue(gridCount(menu) == 8 && crafting(menu).getSlots().getLast().getItem().is(Items.CHEST),
+                "Mixed variants must still form a complete recipe when neither variant can fill the whole pattern");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void maxTransferKeepsCompleteSets(GameTestHelper helper) {
         var terminal = terminal(helper, 17);
         var player = player(helper);

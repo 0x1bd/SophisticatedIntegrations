@@ -25,8 +25,7 @@ public final class BackpackCraftingBridge {
 
     public static boolean canFill(StorageContainerMenuBase<?> menu, ResourceLocation recipeId) {
         var player = Minecraft.getInstance().player;
-        if (player == null || recipeId == null || !(menu instanceof BackpackContainer)
-                || !((BackpackCraftingMenu) menu).sophisticatedIntegrations$craftingSession().linked()) return false;
+        if (player == null || recipeId == null || !(menu instanceof BackpackContainer)) return false;
         var recipe = player.level().getRecipeManager().byKey(recipeId).orElse(null);
         return recipe != null && recipe.value() instanceof CraftingRecipe crafting
                 && menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).isPresent()

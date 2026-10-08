@@ -27,7 +27,7 @@ public final class BackpackRecipeTransfer {
         if (holder == null || !(holder.value() instanceof CraftingRecipe recipe)) return;
         var crafting = menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).orElse(null);
         if (!(crafting instanceof CraftingUpgradeContainer upgrade)) return;
-        var plan = RecipeIngredientPlanner.plan(player, menu, recipe, BackpackCraftingSession.snapshot(terminal));
+        var plan = RecipeIngredientPlanner.plan(player, menu, recipe, BackpackCraftingSession.snapshot(terminal), maxTransfer);
         if (plan.isEmpty()) return;
         List<Slot> grid = upgrade.getRecipeSlots();
         if (grid.size() != 9 || grid.stream().anyMatch(slot -> !slot.mayPickup(player))) return;

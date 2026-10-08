@@ -23,11 +23,16 @@ public final class RecipeIngredientPlanner {
 
     public static Optional<List<ItemStack>> plan(Player player, StorageContainerMenuBase<?> menu, CraftingRecipe recipe,
                                                  List<NetworkIngredient> network) {
+        return plan(player, menu, recipe, network, false);
+    }
+
+    public static Optional<List<ItemStack>> plan(Player player, StorageContainerMenuBase<?> menu, CraftingRecipe recipe,
+                                                 List<NetworkIngredient> network, boolean maxTransfer) {
         if (recipe.getIngredients().isEmpty() || recipe.getIngredients().size() > 9) return Optional.empty();
         Map<StoredItemStack, Long> available = new LinkedHashMap<>();
         List<Slot> sources = new ArrayList<>(menu.slots);
         menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).ifPresent(c -> sources.addAll(c.getRecipeSlots()));
-        for (Slot slot : sources) {
+        for (Slot slot : sources.stream().distinct().toList()) {
             ItemStack stack = slot.getItem();
             if (!stack.isEmpty() && slot.mayPickup(player))
                 available.merge(new StoredItemStack(stack.copyWithCount(1)), (long) stack.getCount(), Long::sum);
@@ -55,19 +60,38 @@ public final class RecipeIngredientPlanner {
             candidates.put(i, matches);
         }
         List<Integer> order = candidates.keySet().stream().sorted(java.util.Comparator.comparingInt(i -> candidates.get(i).size())).toList();
-        return choose(0, order, candidates, chosen, available, recipe, player) ? Optional.of(chosen) : Optional.empty();
+        if (order.isEmpty()) return Optional.empty();
+        List<Slot> grid = menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).orElseThrow().getRecipeSlots();
+        int lower = 1;
+        int upper = maxTransfer ? candidates.values().stream().flatMap(List::stream)
+                .mapToInt(item -> item.getStack().getMaxStackSize()).max().orElse(1) : 1;
+        List<ItemStack> best = null;
+        while (lower <= upper) {
+            int batch = lower + (upper - lower) / 2;
+            if (choose(0, order, candidates, chosen, new LinkedHashMap<>(available), recipe, player, grid, batch)) {
+                best = List.copyOf(chosen);
+                lower = batch + 1;
+            } else {
+                upper = batch - 1;
+            }
+        }
+        return Optional.ofNullable(best);
     }
 
     private static boolean choose(int depth, List<Integer> order, Map<Integer, List<StoredItemStack>> candidates, List<ItemStack> chosen,
-                                  Map<StoredItemStack, Long> available, CraftingRecipe recipe, Player player) {
+                                  Map<StoredItemStack, Long> available, CraftingRecipe recipe, Player player, List<Slot> grid, int batch) {
         if (depth == order.size()) return recipe.matches(CraftingInput.of(3, 3, chosen), player.level());
         int index = order.get(depth);
+        List<StoredItemStack> matches = candidates.get(index);
+        long remainingSlots = order.subList(depth, order.size()).stream().filter(i -> candidates.get(i).equals(matches)).count();
+        long capacity = matches.stream().mapToLong(item -> Math.min(available.get(item) / batch, remainingSlots)).sum();
+        if (capacity < remainingSlots) return false;
         for (StoredItemStack candidate : candidates.get(index)) {
             long count = available.get(candidate);
-            if (count <= 0) continue;
-            available.put(candidate, count - 1);
+            if (count < batch || batch > grid.get(index).getMaxStackSize(candidate.getStack())) continue;
+            available.put(candidate, count - batch);
             chosen.set(index, candidate.getStack().copyWithCount(1));
-            if (choose(depth + 1, order, candidates, chosen, available, recipe, player)) return true;
+            if (choose(depth + 1, order, candidates, chosen, available, recipe, player, grid, batch)) return true;
             available.put(candidate, count);
         }
 

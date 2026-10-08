@@ -21,12 +21,6 @@ public abstract class StorageTerminalBlockEntityMixin {
         if (session != null) callback.setReturnValue(session.merge(callback.getReturnValue()));
     }
 
-    @Inject(method = "getChangeCount", at = @At("RETURN"), cancellable = true)
-    private void sophisticatedIntegrations$personalRevision(CallbackInfoReturnable<Integer> callback) {
-        TerminalSession session = TerminalContext.forTerminal((StorageTerminalBlockEntity) (Object) this);
-        if (session != null) callback.setReturnValue(session.revision());
-    }
-
     @Inject(method = "pullStack", at = @At("RETURN"), cancellable = true)
     private void sophisticatedIntegrations$extract(StoredItemStack stack, long amount, CallbackInfoReturnable<StoredItemStack> callback) {
         TerminalSession session = TerminalContext.forTerminal((StorageTerminalBlockEntity) (Object) this);
