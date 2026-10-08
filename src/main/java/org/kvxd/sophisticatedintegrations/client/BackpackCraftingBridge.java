@@ -10,7 +10,6 @@ import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import org.kvxd.sophisticatedintegrations.crafting.BackpackCraftingMenu;
 import org.kvxd.sophisticatedintegrations.crafting.NetworkIngredient;
 import org.kvxd.sophisticatedintegrations.crafting.RecipeIngredientPlanner;
-import org.kvxd.sophisticatedintegrations.crafting.BackpackRecipeTransfer;
 import org.kvxd.sophisticatedintegrations.network.BackpackRecipePayload;
 
 import java.util.List;
@@ -35,7 +34,7 @@ public final class BackpackCraftingBridge {
     }
 
     public static void fill(StorageContainerMenuBase<?> menu, ResourceLocation recipeId, boolean maxTransfer, int action) {
-        BackpackRecipeTransfer.openCraftingTab(menu);
+        BackpackCraftingTabs.open(menu);
         PacketDistributor.sendToServer(new BackpackRecipePayload(menu.containerId, recipeId, maxTransfer, action));
     }
 }

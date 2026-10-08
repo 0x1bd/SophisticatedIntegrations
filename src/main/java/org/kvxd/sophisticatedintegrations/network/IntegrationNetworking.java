@@ -7,6 +7,7 @@ import org.kvxd.sophisticatedintegrations.crafting.InventoryCraftingAccess;
 import org.kvxd.sophisticatedintegrations.crafting.InventoryRecipeRouting;
 import net.minecraft.server.level.ServerPlayer;
 import net.p3pp3rf1y.sophisticatedbackpacks.common.gui.BackpackContainer;
+import org.kvxd.sophisticatedintegrations.client.BackpackCraftingTabs;
 
 public final class IntegrationNetworking {
     private IntegrationNetworking() {
@@ -24,7 +25,7 @@ public final class IntegrationNetworking {
                 (payload, context) -> ((InventoryCraftingAccess) context.player().inventoryMenu).sophisticatedIntegrations$setCraftingBackpack(payload.available()));
         registrar.playToClient(BackpackCraftingTabPayload.TYPE, BackpackCraftingTabPayload.STREAM_CODEC, (payload, context) -> {
             if (context.player().containerMenu instanceof BackpackContainer menu && menu.containerId == payload.containerId()) {
-                BackpackRecipeTransfer.openCraftingTab(menu);
+                BackpackCraftingTabs.open(menu);
             }
         });
         registrar.playToServer(InventoryBackpackRecipePayload.TYPE, InventoryBackpackRecipePayload.STREAM_CODEC, (payload, context) -> {
