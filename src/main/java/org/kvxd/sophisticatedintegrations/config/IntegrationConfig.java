@@ -8,6 +8,7 @@ public final class IntegrationConfig {
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.BooleanValue INSERT_INTO_BACKPACKS;
     public static final ModConfigSpec.BooleanValue BACKPACK_CRAFTING;
+    public static final ModConfigSpec.BooleanValue AUTO_OPEN_CRAFTING;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -20,6 +21,8 @@ public final class IntegrationConfig {
         builder.push("backpackCrafting");
         BACKPACK_CRAFTING = builder.comment("Use a carried, bound Advanced Wireless Terminal for missing backpack crafting ingredients and refill.")
                 .define("useLinkedNetwork", true);
+        AUTO_OPEN_CRAFTING = builder.comment("Open an equipped or carried crafting backpack for inventory recipe transfers that need a 3x3 grid.")
+                .define("openFromInventory", true);
         builder.pop();
         SPEC = builder.build();
     }

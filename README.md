@@ -13,6 +13,8 @@ JEI, EMI, and REI are all supported.
 
 ## Backpack crafting
 
+While your normal inventory is open, transferring a recipe that needs more than 2×2 in JEI, EMI, or REI automatically opens a backpack with a Crafting Upgrade and fills its grid.
+
 Carry a bound **Advanced Wireless Terminal** and open a backpack with a **Crafting Upgrade**. Recipe transfers use backpack/player ingredients first, then the linked Tom's network. Maximum transfers preserve complete recipe sets. Enable Sophisticated's existing refill toggle to refill the grid from the network after crafting; refill also works without a recipe viewer.
 
 The first carried, bound Advanced Wireless Terminal selects the network. Tom's range, dimension, and beacon rules apply, and the target chunk must already be loaded. Removing the terminal or losing access stops extraction. Results and crafting remainders keep Sophisticated's normal destinations.
@@ -41,6 +43,7 @@ Install the addon and the three storage dependencies on both client and server.
 - `terminal.includeBackpacks` (default `true`): enable personal backpack access in terminals.
 - `terminal.insertIntoBackpacks` (default `true`): allow deposit overflow into backpacks.
 - `backpackCrafting.useLinkedNetwork` (default `true`): enable network ingredients and refill in backpack crafting upgrades.
+- `backpackCrafting.openFromInventory` (default `true`): automatically open a crafting backpack for larger inventory recipe transfers.
 
 ## Development
 

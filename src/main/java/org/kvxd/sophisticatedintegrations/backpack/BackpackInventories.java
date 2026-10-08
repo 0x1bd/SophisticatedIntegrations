@@ -6,7 +6,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.p3pp3rf1y.sophisticatedbackpacks.backpack.BackpackItem;
 import net.p3pp3rf1y.sophisticatedbackpacks.backpack.wrapper.BackpackWrapper;
-import net.p3pp3rf1y.sophisticatedbackpacks.util.PlayerInventoryProvider;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,14 +24,13 @@ public final class BackpackInventories {
         Set<UUID> contentsIds = new HashSet<>();
         Set<IItemHandler> instances = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        PlayerInventoryProvider.get().runOnBackpacks(player, (stack, inventory, identifier, slot) -> {
-            var wrapper = BackpackWrapper.fromStack(stack);
+        for (BackpackLocation location : PlayerBackpacks.find(player)) {
+            var wrapper = BackpackWrapper.fromStack(location.stack());
             var handler = wrapper.getInventoryForInputOutput();
             var contentsId = wrapper.getContentsUuid();
-            if (contentsId.isPresent() && !contentsIds.add(contentsId.get())) return false;
+            if (contentsId.isPresent() && !contentsIds.add(contentsId.get())) continue;
             if (instances.add(handler)) handlers.add(handler);
-            return false;
-        });
+        }
 
         return handlers;
     }

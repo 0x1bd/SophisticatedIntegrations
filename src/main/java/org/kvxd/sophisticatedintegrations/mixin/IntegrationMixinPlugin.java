@@ -11,9 +11,9 @@ import java.util.Set;
 public final class IntegrationMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        String mod = mixinClassName.endsWith("BackpackJeiTransferMixin") ? "jei"
-                : mixinClassName.endsWith("BackpackEmiTransferMixin") ? "emi"
-                  : mixinClassName.endsWith("BackpackReiTransferMixin") ? "roughlyenoughitems" : null;
+        String mod = mixinClassName.endsWith("JeiTransferMixin") ? "jei"
+                : mixinClassName.endsWith("EmiTransferMixin") ? "emi"
+                  : mixinClassName.endsWith("ReiTransferMixin") ? "roughlyenoughitems" : null;
         return mod == null || FMLLoader.getLoadingModList().getModFileById(mod) != null;
     }
 

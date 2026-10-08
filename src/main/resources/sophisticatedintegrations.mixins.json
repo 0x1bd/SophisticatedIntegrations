@@ -12,12 +12,16 @@
     "TerminalCraftingFillerMixin",
     "BackpackCraftingMenuMixin",
     "BackpackRecipeFillerMixin",
-    "BackpackCraftingRefillMixin"
+    "BackpackCraftingRefillMixin",
+    "InventoryCraftingMenuMixin"
   ],
   "client": [
     "client.BackpackJeiTransferMixin",
     "client.BackpackEmiTransferMixin",
-    "client.BackpackReiTransferMixin"
+    "client.BackpackReiTransferMixin",
+    "client.InventoryJeiTransferMixin",
+    "client.InventoryEmiTransferMixin",
+    "client.InventoryReiTransferMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

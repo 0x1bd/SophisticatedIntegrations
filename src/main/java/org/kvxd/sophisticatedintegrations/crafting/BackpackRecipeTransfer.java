@@ -8,6 +8,7 @@ import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.p3pp3rf1y.sophisticatedbackpacks.common.gui.BackpackContainer;
+import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import net.p3pp3rf1y.sophisticatedcore.compat.recipeviewers.common.CraftingContainerRecipeTransferHandlerServer;
 import net.p3pp3rf1y.sophisticatedcore.upgrades.crafting.CraftingUpgradeContainer;
 
@@ -22,7 +23,6 @@ public final class BackpackRecipeTransfer {
                 || !menu.stillValid(player)) return;
         var session = ((BackpackCraftingMenu) menu).sophisticatedIntegrations$craftingSession();
         var terminal = session.terminal();
-        if (terminal == null) return;
         var holder = player.level().getRecipeManager().byKey(recipeId).orElse(null);
         if (holder == null || !(holder.value() instanceof CraftingRecipe recipe)) return;
         var crafting = menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).orElse(null);
@@ -38,5 +38,13 @@ public final class BackpackRecipeTransfer {
             Slot output = upgrade.getSlots().getLast();
             menu.clicked(output.index, 0, action == 1 ? ClickType.PICKUP : ClickType.QUICK_MOVE, player);
         }
+    }
+
+    public static void openCraftingTab(StorageContainerMenuBase<?> menu) {
+        menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).ifPresent(crafting -> {
+            menu.getOpenContainer().filter(open -> open != crafting).ifPresent(open -> open.setIsOpen(false));
+            crafting.setIsOpen(true);
+            menu.setOpenTabId(crafting.getUpgradeContainerId());
+        });
     }
 }
