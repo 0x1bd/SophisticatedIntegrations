@@ -26,10 +26,12 @@ public final class BackpackCraftingBridge {
     public static boolean canFill(StorageContainerMenuBase<?> menu, ResourceLocation recipeId) {
         var player = Minecraft.getInstance().player;
         if (player == null || recipeId == null || !(menu instanceof BackpackContainer)) return false;
+        var network = ingredients(menu);
+        if (network.isEmpty()) return false;
         var recipe = player.level().getRecipeManager().byKey(recipeId).orElse(null);
         return recipe != null && recipe.value() instanceof CraftingRecipe crafting
                 && menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).isPresent()
-                && RecipeIngredientPlanner.plan(player, menu, crafting, ingredients(menu)).isPresent();
+                && RecipeIngredientPlanner.plan(player, menu, crafting, network).isPresent();
     }
 
     public static void fill(StorageContainerMenuBase<?> menu, ResourceLocation recipeId, boolean maxTransfer, int action) {

@@ -35,13 +35,6 @@ public abstract class BackpackEmiTransferMixin {
         ci.setReturnValue(new EmiPlayerInventory(items));
     }
 
-    @Inject(method = "canCraft", at = @At("HEAD"), cancellable = true)
-    private void sophisticatedIntegrations$canCraft(EmiRecipe recipe, EmiCraftContext<? extends StorageContainerMenuBase<?>> context,
-                                                    CallbackInfoReturnable<Boolean> ci) {
-        if (recipeType == RecipeType.CRAFTING && VanillaEmiRecipeCategories.CRAFTING.equals(recipe.getCategory())
-                && BackpackCraftingBridge.canFill(context.getScreenHandler(), recipe.getId())) ci.setReturnValue(true);
-    }
-
     @Inject(method = "craft", at = @At("HEAD"), cancellable = true)
     private void sophisticatedIntegrations$linkedRecipe(EmiRecipe recipe, EmiCraftContext<? extends StorageContainerMenuBase<?>> context,
                                                         CallbackInfoReturnable<Boolean> ci) {
