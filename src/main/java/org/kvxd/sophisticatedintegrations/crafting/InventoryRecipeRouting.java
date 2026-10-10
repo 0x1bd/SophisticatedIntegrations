@@ -10,7 +10,6 @@ import net.p3pp3rf1y.sophisticatedbackpacks.common.gui.BackpackContainer;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SophisticatedMenuProvider;
 import org.kvxd.sophisticatedintegrations.config.IntegrationConfig;
 import org.kvxd.sophisticatedintegrations.network.BackpackCraftingTabPayload;
-import org.kvxd.sophisticatedintegrations.network.InventoryCraftingAvailabilityPayload;
 
 public final class InventoryRecipeRouting {
     private InventoryRecipeRouting() {
@@ -30,11 +29,7 @@ public final class InventoryRecipeRouting {
 
     public static void broadcast(ServerPlayer player) {
         if (player.containerMenu != player.inventoryMenu) return;
-        InventoryCraftingAccess access = (InventoryCraftingAccess) player.inventoryMenu;
-        boolean available = !player.isSpectator() && IntegrationConfig.AUTO_OPEN_CRAFTING.get() && CraftingBackpackFinder.find(player).isPresent();
-        if (available == access.sophisticatedIntegrations$hasCraftingBackpack()) return;
-        access.sophisticatedIntegrations$setCraftingBackpack(available);
-        PacketDistributor.sendToPlayer(player, new InventoryCraftingAvailabilityPayload(available));
+        ((InventoryCraftingAccess) player.inventoryMenu).sophisticatedIntegrations$inventoryCraftingSession().broadcast(player);
     }
 
     public static void openAndFill(ServerPlayer player, int menuId, ResourceLocation recipeId, boolean maxTransfer, int action) {

@@ -14,7 +14,7 @@ public final class IntegrationNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("1");
+        var registrar = event.registrar("2");
         registrar.playToClient(BackpackNetworkPayload.TYPE, BackpackNetworkPayload.STREAM_CODEC, (payload, context) -> {
             if (context.player().containerMenu instanceof BackpackCraftingMenu menu)
                 menu.sophisticatedIntegrations$craftingSession().receive(payload);
@@ -22,7 +22,7 @@ public final class IntegrationNetworking {
         registrar.playToServer(BackpackRecipePayload.TYPE, BackpackRecipePayload.STREAM_CODEC,
                 (payload, context) -> BackpackRecipeTransfer.fill(context.player(), payload.containerId(), payload.recipeId(), payload.maxTransfer(), payload.action()));
         registrar.playToClient(InventoryCraftingAvailabilityPayload.TYPE, InventoryCraftingAvailabilityPayload.STREAM_CODEC,
-                (payload, context) -> ((InventoryCraftingAccess) context.player().inventoryMenu).sophisticatedIntegrations$setCraftingBackpack(payload.available()));
+                (payload, context) -> ((InventoryCraftingAccess) context.player().inventoryMenu).sophisticatedIntegrations$inventoryCraftingSession().receive(payload));
         registrar.playToClient(BackpackCraftingTabPayload.TYPE, BackpackCraftingTabPayload.STREAM_CODEC, (payload, context) -> {
             if (context.player().containerMenu instanceof BackpackContainer menu && menu.containerId == payload.containerId()) {
                 BackpackCraftingTabs.open(menu);

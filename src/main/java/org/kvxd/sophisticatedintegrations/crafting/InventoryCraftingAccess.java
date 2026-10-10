@@ -1,7 +1,9 @@
 package org.kvxd.sophisticatedintegrations.crafting;
 
 public interface InventoryCraftingAccess {
-    boolean sophisticatedIntegrations$hasCraftingBackpack();
+    InventoryCraftingSession sophisticatedIntegrations$inventoryCraftingSession();
 
-    void sophisticatedIntegrations$setCraftingBackpack(boolean available);
+    default boolean sophisticatedIntegrations$hasCraftingBackpack() {
+        return sophisticatedIntegrations$inventoryCraftingSession().available();
+    }
 }

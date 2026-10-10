@@ -1,6 +1,7 @@
 package org.kvxd.sophisticatedintegrations.mixin.client;
 
 import me.shedaniel.rei.api.client.registry.transfer.TransferHandler;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.InventoryMenu;
 import org.kvxd.sophisticatedintegrations.client.InventoryCraftingBridge;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,6 +23,10 @@ public abstract class InventoryReiTransferMixin {
         var recipeId = context.getDisplay().getDisplayLocation().orElse(null);
         if (!(context.getMenu() instanceof InventoryMenu menu) || !InventoryCraftingBridge.canRoute(menu, recipeId))
             return;
+        if (!InventoryCraftingBridge.canFill(menu, recipeId)) {
+            ci.setReturnValue(TransferHandler.Result.createFailed(Component.translatable("gui.sophisticatedintegrations.missing_ingredients")));
+            return;
+        }
         if (context.isActuallyCrafting()) InventoryCraftingBridge.route(menu, recipeId, context.isStackedCrafting(), 0);
         ci.setReturnValue(TransferHandler.Result.createSuccessful());
     }

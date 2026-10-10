@@ -39,8 +39,13 @@ public final class BackpackCraftingSession {
                 ? LinkedTerminalAccess.find(player) : null;
     }
 
-    public boolean linked() { return isCurrent() && linked; }
-    public List<NetworkIngredient> ingredients() { return linked() ? ingredients : List.of(); }
+    public boolean linked() {
+        return isCurrent() && linked;
+    }
+
+    public List<NetworkIngredient> ingredients() {
+        return linked() ? ingredients : List.of();
+    }
 
     public static List<NetworkIngredient> snapshot(StorageTerminalBlockEntity terminal) {
         if (terminal == null) return List.of();
@@ -67,11 +72,12 @@ public final class BackpackCraftingSession {
         }
     }
 
-    private static boolean sameContents(List<NetworkIngredient> first, List<NetworkIngredient> second) {
+    static boolean sameContents(List<NetworkIngredient> first, List<NetworkIngredient> second) {
         if (first.size() != second.size()) return false;
         for (int i = 0; i < first.size(); i++) {
             if (first.get(i).quantity() != second.get(i).quantity()
-                    || !ItemStack.isSameItemSameComponents(first.get(i).template(), second.get(i).template())) return false;
+                    || !ItemStack.isSameItemSameComponents(first.get(i).template(), second.get(i).template()))
+                return false;
         }
         return true;
     }

@@ -28,17 +28,37 @@ public final class RecipeIngredientPlanner {
 
     public static Optional<List<ItemStack>> plan(Player player, StorageContainerMenuBase<?> menu, CraftingRecipe recipe,
                                                  List<NetworkIngredient> network, boolean maxTransfer) {
-        if (recipe.getIngredients().isEmpty() || recipe.getIngredients().size() > 9) return Optional.empty();
-        Map<StoredItemStack, Long> available = new LinkedHashMap<>();
+        var crafting = menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).orElse(null);
+        if (crafting == null) return Optional.empty();
+        List<NetworkIngredient> available = new ArrayList<>(inventory(player, menu));
+        available.addAll(network);
+        List<Slot> grid = crafting.getRecipeSlots();
+        if (grid.size() != 9) return Optional.empty();
+        return plan(player, recipe, available, (index, stack) -> grid.get(index).getMaxStackSize(stack), maxTransfer);
+    }
+
+    public static List<NetworkIngredient> inventory(Player player, StorageContainerMenuBase<?> menu) {
         List<Slot> sources = new ArrayList<>(menu.slots);
         menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).ifPresent(c -> sources.addAll(c.getRecipeSlots()));
-        for (Slot slot : sources.stream().distinct().toList()) {
-            ItemStack stack = slot.getItem();
-            if (!stack.isEmpty() && slot.mayPickup(player))
-                available.merge(new StoredItemStack(stack.copyWithCount(1)), (long) stack.getCount(), Long::sum);
+        return sources.stream().distinct().filter(slot -> slot.mayPickup(player)).map(Slot::getItem)
+                .filter(stack -> !stack.isEmpty())
+                .map(stack -> new NetworkIngredient(stack.copyWithCount(1), stack.getCount())).toList();
+    }
+
+    public static Optional<List<ItemStack>> plan(Player player, CraftingRecipe recipe, List<NetworkIngredient> ingredients) {
+        return plan(player, recipe, ingredients, (index, stack) -> stack.getMaxStackSize(), false);
+    }
+
+    private static Optional<List<ItemStack>> plan(Player player, CraftingRecipe recipe, List<NetworkIngredient> ingredients,
+                                                  java.util.function.ToIntBiFunction<Integer, ItemStack> slotLimit, boolean maxTransfer) {
+        if (recipe.getIngredients().isEmpty() || recipe.getIngredients().size() > 9) return Optional.empty();
+        if (recipe instanceof ShapedRecipe shaped && (shaped.getWidth() > 3 || shaped.getHeight() > 3))
+            return Optional.empty();
+        Map<StoredItemStack, Long> available = new LinkedHashMap<>();
+        for (NetworkIngredient item : ingredients) {
+            if (item.quantity() > 0 && !item.template().isEmpty())
+                available.merge(new StoredItemStack(item.template()), item.quantity(), Long::sum);
         }
-        for (NetworkIngredient item : network)
-            available.merge(new StoredItemStack(item.template()), item.quantity(), Long::sum);
         List<Ingredient> inputs = new ArrayList<>(java.util.Collections.nCopies(9, Ingredient.EMPTY));
 
         if (recipe instanceof ShapedRecipe shaped) {
@@ -61,14 +81,13 @@ public final class RecipeIngredientPlanner {
         }
         List<Integer> order = candidates.keySet().stream().sorted(java.util.Comparator.comparingInt(i -> candidates.get(i).size())).toList();
         if (order.isEmpty()) return Optional.empty();
-        List<Slot> grid = menu.getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).orElseThrow().getRecipeSlots();
         int lower = 1;
         int upper = maxTransfer ? candidates.values().stream().flatMap(List::stream)
-                .mapToInt(item -> item.getStack().getMaxStackSize()).max().orElse(1) : 1;
+                                  .mapToInt(item -> item.getStack().getMaxStackSize()).max().orElse(1) : 1;
         List<ItemStack> best = null;
         while (lower <= upper) {
             int batch = lower + (upper - lower) / 2;
-            if (choose(0, order, candidates, chosen, new LinkedHashMap<>(available), recipe, player, grid, batch)) {
+            if (choose(0, order, candidates, chosen, new LinkedHashMap<>(available), recipe, player, slotLimit, batch)) {
                 best = List.copyOf(chosen);
                 lower = batch + 1;
             } else {
@@ -79,7 +98,8 @@ public final class RecipeIngredientPlanner {
     }
 
     private static boolean choose(int depth, List<Integer> order, Map<Integer, List<StoredItemStack>> candidates, List<ItemStack> chosen,
-                                  Map<StoredItemStack, Long> available, CraftingRecipe recipe, Player player, List<Slot> grid, int batch) {
+                                  Map<StoredItemStack, Long> available, CraftingRecipe recipe, Player player,
+                                  java.util.function.ToIntBiFunction<Integer, ItemStack> slotLimit, int batch) {
         if (depth == order.size()) return recipe.matches(CraftingInput.of(3, 3, chosen), player.level());
         int index = order.get(depth);
         List<StoredItemStack> matches = candidates.get(index);
@@ -88,10 +108,10 @@ public final class RecipeIngredientPlanner {
         if (capacity < remainingSlots) return false;
         for (StoredItemStack candidate : candidates.get(index)) {
             long count = available.get(candidate);
-            if (count < batch || batch > grid.get(index).getMaxStackSize(candidate.getStack())) continue;
+            if (count < batch || batch > slotLimit.applyAsInt(index, candidate.getStack())) continue;
             available.put(candidate, count - batch);
             chosen.set(index, candidate.getStack().copyWithCount(1));
-            if (choose(depth + 1, order, candidates, chosen, available, recipe, player, grid, batch)) return true;
+            if (choose(depth + 1, order, candidates, chosen, available, recipe, player, slotLimit, batch)) return true;
             available.put(candidate, count);
         }
 

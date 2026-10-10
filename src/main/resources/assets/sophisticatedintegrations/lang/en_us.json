@@ -1,5 +1,6 @@
 {
   "gui.sophisticatedintegrations.backpacks": "Include backpack items",
   "gui.sophisticatedintegrations.backpacks.off": "Backpack items: off",
-  "gui.sophisticatedintegrations.backpacks.on": "Backpack items: on"
+  "gui.sophisticatedintegrations.backpacks.on": "Backpack items: on",
+  "gui.sophisticatedintegrations.missing_ingredients": "Missing ingredients"
 }

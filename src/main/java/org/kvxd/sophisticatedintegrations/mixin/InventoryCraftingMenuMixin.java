@@ -2,21 +2,17 @@ package org.kvxd.sophisticatedintegrations.mixin;
 
 import net.minecraft.world.inventory.InventoryMenu;
 import org.kvxd.sophisticatedintegrations.crafting.InventoryCraftingAccess;
+import org.kvxd.sophisticatedintegrations.crafting.InventoryCraftingSession;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(InventoryMenu.class)
 public abstract class InventoryCraftingMenuMixin implements InventoryCraftingAccess {
     @Unique
-    private boolean sophisticatedIntegrations$hasCraftingBackpack;
+    private final InventoryCraftingSession sophisticatedIntegrations$inventoryCraftingSession = new InventoryCraftingSession();
 
     @Override
-    public boolean sophisticatedIntegrations$hasCraftingBackpack() {
-        return sophisticatedIntegrations$hasCraftingBackpack;
-    }
-
-    @Override
-    public void sophisticatedIntegrations$setCraftingBackpack(boolean available) {
-        sophisticatedIntegrations$hasCraftingBackpack = available;
+    public InventoryCraftingSession sophisticatedIntegrations$inventoryCraftingSession() {
+        return sophisticatedIntegrations$inventoryCraftingSession;
     }
 }
