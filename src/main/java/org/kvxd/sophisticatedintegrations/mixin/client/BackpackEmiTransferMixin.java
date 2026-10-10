@@ -8,7 +8,6 @@ import dev.emi.emi.api.recipe.handler.StandardRecipeHandler;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.widget.Widget;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
@@ -61,12 +60,6 @@ public abstract class BackpackEmiTransferMixin implements StandardRecipeHandler<
     }
 
     @Override
-    public List<ClientTooltipComponent> getTooltip(EmiRecipe recipe, EmiCraftContext<StorageContainerMenuBase<?>> context) {
-        return StandardRecipeHandler.super.getTooltip(recipe, sophisticatedIntegrations$handles(context.getScreenHandler(), recipe)
-                ? sophisticatedIntegrations$freshContext(context) : context);
-    }
-
-    @Override
     public void render(EmiRecipe recipe, EmiCraftContext<StorageContainerMenuBase<?>> context, List<Widget> widgets, GuiGraphics draw) {
         StandardRecipeHandler.super.render(recipe, sophisticatedIntegrations$handles(context.getScreenHandler(), recipe)
                 ? sophisticatedIntegrations$freshContext(context) : context, widgets, draw);
@@ -75,14 +68,20 @@ public abstract class BackpackEmiTransferMixin implements StandardRecipeHandler<
     @Inject(method = "canCraft", at = @At("HEAD"), cancellable = true)
     private void sophisticatedIntegrations$canCraft(EmiRecipe recipe, EmiCraftContext<? extends StorageContainerMenuBase<?>> context,
                                                     CallbackInfoReturnable<Boolean> ci) {
-        if (sophisticatedIntegrations$handles(context.getScreenHandler(), recipe))
-            ci.setReturnValue(BackpackCraftingBridge.canFill(context.getScreenHandler(), recipe.getId()));
+        if (!sophisticatedIntegrations$handles(context.getScreenHandler(), recipe)) return;
+        // EMI scans all craftable recipes using one inventory snapshot. Only the open
+        // recipe's transfer button needs a fresh snapshot; neither path runs the planner.
+        var inventory = context.getType() == EmiCraftContext.Type.CRAFTABLE ? context.getInventory()
+                : sophisticatedIntegrations$inventory(context.getScreenHandler());
+        ci.setReturnValue(context.getScreenHandler().getOpenOrFirstCraftingContainer(RecipeType.CRAFTING).isPresent()
+                && inventory.canCraft(recipe));
     }
 
     @Inject(method = "craft", at = @At("HEAD"), cancellable = true)
     private void sophisticatedIntegrations$linkedRecipe(EmiRecipe recipe, EmiCraftContext<? extends StorageContainerMenuBase<?>> context,
                                                         CallbackInfoReturnable<Boolean> ci) {
         if (!sophisticatedIntegrations$handles(context.getScreenHandler(), recipe)) return;
+        if (BackpackCraftingBridge.ingredients(context.getScreenHandler()).isEmpty()) return;
         if (!BackpackCraftingBridge.canFill(context.getScreenHandler(), recipe.getId())) {
             ci.setReturnValue(false);
             return;
