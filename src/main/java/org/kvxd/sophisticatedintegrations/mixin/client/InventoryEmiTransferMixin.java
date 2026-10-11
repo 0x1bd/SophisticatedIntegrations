@@ -12,6 +12,7 @@ import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent
 import net.minecraft.world.inventory.InventoryMenu;
 import org.kvxd.sophisticatedintegrations.client.InventoryCraftingBridge;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -21,6 +22,13 @@ import java.util.ArrayList;
 
 @Mixin(targets = "dev.emi.emi.handler.InventoryRecipeHandler")
 public abstract class InventoryEmiTransferMixin implements StandardRecipeHandler<InventoryMenu> {
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$lastCraftableInventory;
+    @Unique
+    private InventoryMenu sophisticatedIntegrations$lastCraftableMenu;
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$localCraftableInventory;
+
     @Inject(method = "supportsRecipe", at = @At("HEAD"), cancellable = true)
     private void sophisticatedIntegrations$largeRecipe(EmiRecipe recipe, CallbackInfoReturnable<Boolean> ci) {
         if (InventoryCraftingBridge.canRoute(recipe.getId())) ci.setReturnValue(true);
@@ -28,17 +36,29 @@ public abstract class InventoryEmiTransferMixin implements StandardRecipeHandler
 
     @Inject(method = "canCraft", at = @At("HEAD"), cancellable = true)
     private void sophisticatedIntegrations$canOpen(EmiRecipe recipe, EmiCraftContext<InventoryMenu> context, CallbackInfoReturnable<Boolean> ci) {
-        if (InventoryCraftingBridge.canRoute(context.getScreenHandler(), recipe.getId()))
-            ci.setReturnValue(InventoryCraftingBridge.canFill(context.getScreenHandler(), recipe.getId()));
-        else
-            ci.setReturnValue(supportsRecipe(recipe) && sophisticatedIntegrations$inventory(context.getScreen(), false).canCraft(recipe));
+        boolean backpack = InventoryCraftingBridge.canRoute(context.getScreenHandler(), recipe.getId());
+        EmiPlayerInventory inventory = context.getType() == EmiCraftContext.Type.CRAFTABLE
+                ? backpack ? context.getInventory() : sophisticatedIntegrations$localSnapshot(context)
+                : sophisticatedIntegrations$inventory(context.getScreen(), backpack);
+        ci.setReturnValue((backpack || supportsRecipe(recipe)) && inventory.canCraft(recipe));
+    }
+
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$localSnapshot(EmiCraftContext<InventoryMenu> context) {
+        if (sophisticatedIntegrations$lastCraftableInventory != context.getInventory()
+                || sophisticatedIntegrations$lastCraftableMenu != context.getScreenHandler()) {
+            sophisticatedIntegrations$lastCraftableInventory = context.getInventory();
+            sophisticatedIntegrations$lastCraftableMenu = context.getScreenHandler();
+            sophisticatedIntegrations$localCraftableInventory = sophisticatedIntegrations$inventory(context.getScreen(), false);
+        }
+        return sophisticatedIntegrations$localCraftableInventory;
     }
 
     @Inject(method = "getTooltip", at = @At("HEAD"), cancellable = true)
     private void sophisticatedIntegrations$largeRecipeTooltip(EmiRecipe recipe, EmiCraftContext<InventoryMenu> context,
                                                               CallbackInfoReturnable<List<ClientTooltipComponent>> ci) {
         if (InventoryCraftingBridge.canRoute(context.getScreenHandler(), recipe.getId()))
-            ci.setReturnValue(StandardRecipeHandler.super.getTooltip(recipe, sophisticatedIntegrations$freshContext(recipe, context)));
+            ci.setReturnValue(StandardRecipeHandler.super.getTooltip(recipe, context));
     }
 
     @Override
