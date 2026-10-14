@@ -4,4 +4,5 @@ public interface IntegrationMenu {
     TerminalSession sophisticatedIntegrations$getSession();
     int sophisticatedIntegrations$backpackMode();
     void sophisticatedIntegrations$setIncludesBackpacks(boolean included);
+    void sophisticatedIntegrations$resort();
 }

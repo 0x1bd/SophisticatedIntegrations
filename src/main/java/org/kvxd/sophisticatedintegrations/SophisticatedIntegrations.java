@@ -8,6 +8,7 @@ import org.kvxd.sophisticatedintegrations.config.IntegrationConfig;
 import org.kvxd.sophisticatedintegrations.network.IntegrationNetworking;
 import org.kvxd.sophisticatedintegrations.crafting.InventoryRecipeRouting;
 import net.neoforged.neoforge.common.NeoForge;
+import org.kvxd.sophisticatedintegrations.storage.StorageMaintenance;
 
 @Mod(SophisticatedIntegrations.ID)
 public final class SophisticatedIntegrations {
@@ -17,5 +18,7 @@ public final class SophisticatedIntegrations {
         container.registerConfig(ModConfig.Type.SERVER, IntegrationConfig.SPEC);
         bus.addListener(IntegrationNetworking::register);
         NeoForge.EVENT_BUS.addListener(InventoryRecipeRouting::tick);
+        NeoForge.EVENT_BUS.addListener(StorageMaintenance::tick);
+        NeoForge.EVENT_BUS.addListener(StorageMaintenance::stopped);
     }
 }

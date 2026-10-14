@@ -26,11 +26,14 @@ public abstract class InventoryJeiTransferMixin {
     private void sophisticatedIntegrations$openBackpack(InventoryMenu menu, RecipeHolder<?> recipe, IRecipeSlotsView slots,
                                                         Player player, boolean max, boolean transfer, CallbackInfoReturnable<IRecipeTransferError> ci) {
         if (!InventoryCraftingBridge.canRoute(menu, recipe.id())) return;
+        if (!InventoryCraftingBridge.shouldOpen(menu, recipe.id())) return;
         if (!InventoryCraftingBridge.canFill(menu, recipe.id())) {
             ci.setReturnValue(handlerHelper.createUserErrorWithTooltip(Component.translatable("gui.sophisticatedintegrations.missing_ingredients")));
             return;
         }
-        if (transfer) InventoryCraftingBridge.route(menu, recipe.id(), max, 0);
+        if (transfer) {
+            InventoryCraftingBridge.route(menu, recipe.id(), max, 0);
+        }
         ci.setReturnValue(null);
     }
 }

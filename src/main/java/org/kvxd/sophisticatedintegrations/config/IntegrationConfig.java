@@ -21,7 +21,7 @@ public final class IntegrationConfig {
         builder.push("backpackCrafting");
         BACKPACK_CRAFTING = builder.comment("Use a carried, bound Advanced Wireless Terminal for missing backpack crafting ingredients and refill.")
                 .define("useLinkedNetwork", true);
-        AUTO_OPEN_CRAFTING = builder.comment("Open an equipped or carried crafting backpack for inventory recipe transfers that need a 3x3 grid.")
+        AUTO_OPEN_CRAFTING = builder.comment("Open a linked crafting terminal, or a crafting backpack as fallback, when an inventory recipe transfer needs a larger grid or extra ingredients.")
                 .define("openFromInventory", true);
         builder.pop();
         SPEC = builder.build();

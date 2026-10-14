@@ -49,8 +49,18 @@ public final class RecipeIngredientPlanner {
         return plan(player, recipe, ingredients, (index, stack) -> stack.getMaxStackSize(), false);
     }
 
+    public static Optional<List<ItemStack>> planGrid(Player player, CraftingRecipe recipe, List<NetworkIngredient> ingredients,
+                                                    boolean maxTransfer, java.util.function.ToIntBiFunction<Integer, ItemStack> slotLimit) {
+        return plan(player, recipe, ingredients, slotLimit, maxTransfer, true);
+    }
+
     private static Optional<List<ItemStack>> plan(Player player, CraftingRecipe recipe, List<NetworkIngredient> ingredients,
                                                   java.util.function.ToIntBiFunction<Integer, ItemStack> slotLimit, boolean maxTransfer) {
+        return plan(player, recipe, ingredients, slotLimit, maxTransfer, false);
+    }
+
+    private static Optional<List<ItemStack>> plan(Player player, CraftingRecipe recipe, List<NetworkIngredient> ingredients,
+                                                  java.util.function.ToIntBiFunction<Integer, ItemStack> slotLimit, boolean maxTransfer, boolean gridCounts) {
         if (recipe.getIngredients().isEmpty() || recipe.getIngredients().size() > 9) return Optional.empty();
         if (recipe instanceof ShapedRecipe shaped && (shaped.getWidth() > 3 || shaped.getHeight() > 3))
             return Optional.empty();
@@ -88,7 +98,7 @@ public final class RecipeIngredientPlanner {
         while (lower <= upper) {
             int batch = lower + (upper - lower) / 2;
             if (choose(0, order, candidates, chosen, new LinkedHashMap<>(available), recipe, player, slotLimit, batch)) {
-                best = List.copyOf(chosen);
+                best = gridCounts ? chosen.stream().map(stack -> stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(batch)).toList() : List.copyOf(chosen);
                 lower = batch + 1;
             } else {
                 upper = batch - 1;

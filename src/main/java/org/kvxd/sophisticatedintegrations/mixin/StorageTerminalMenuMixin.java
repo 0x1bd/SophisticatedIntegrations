@@ -80,6 +80,18 @@ public abstract class StorageTerminalMenuMixin extends AbstractContainerMenu imp
         return sophisticatedIntegrations$session;
     }
 
+    @Override
+    public void sophisticatedIntegrations$resort() {
+        if (pinv.player.level().isClientSide) {
+            var message = new CompoundTag();
+            message.putBoolean("sophisticatedintegrations:resort", true);
+            message.putInt("sophisticatedintegrations:menu", containerId);
+            ((StorageTerminalMenu) (Object) this).sendMessage(message);
+        } else {
+            sophisticatedIntegrations$getSession().resort();
+        }
+    }
+
     @WrapMethod(method = "broadcastChanges")
     private void sophisticatedIntegrations$sync(Operation<Void> original) {
         if (pinv.player.containerMenu != (Object) this) return;
@@ -101,6 +113,10 @@ public abstract class StorageTerminalMenuMixin extends AbstractContainerMenu imp
 
     @WrapMethod(method = "receive")
     private void sophisticatedIntegrations$receive(CompoundTag message, Operation<Void> original) {
+        if (message.getBoolean("sophisticatedintegrations:resort")
+                && message.getInt("sophisticatedintegrations:menu") == containerId) {
+            sophisticatedIntegrations$resort();
+        }
         if (message.contains(TerminalSession.BACKPACKS_SETTING, Tag.TAG_BYTE)
                 && message.getInt("sophisticatedintegrations:menu") == ((StorageTerminalMenu) (Object) this).containerId) {
             sophisticatedIntegrations$setIncludesBackpacks(message.getBoolean(TerminalSession.BACKPACKS_SETTING));

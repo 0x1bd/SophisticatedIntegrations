@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import org.kvxd.sophisticatedintegrations.client.TerminalBackpackButton;
+import org.kvxd.sophisticatedintegrations.client.TerminalResortButton;
 import org.kvxd.sophisticatedintegrations.terminal.IntegrationMenu;
 import org.kvxd.sophisticatedintegrations.terminal.TerminalSession;
 import org.spongepowered.asm.mixin.Mixin;
@@ -23,6 +24,8 @@ public abstract class TerminalBackpackScreenMixin extends AbstractContainerScree
     protected ToggleButton buttonTallMode;
     @Unique
     private TerminalBackpackButton sophisticatedIntegrations$backpacks;
+    @Unique
+    private TerminalResortButton sophisticatedIntegrations$resort;
 
     protected TerminalBackpackScreenMixin(StorageTerminalMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -32,6 +35,8 @@ public abstract class TerminalBackpackScreenMixin extends AbstractContainerScree
     private void sophisticatedIntegrations$addBackpacks(CallbackInfo callback) {
         sophisticatedIntegrations$backpacks = addRenderableWidget(new TerminalBackpackButton(
                 buttonTallMode.getX(), buttonTallMode.getY() + 18, (IntegrationMenu) menu));
+        sophisticatedIntegrations$resort = addRenderableWidget(new TerminalResortButton(
+                buttonTallMode.getX(), buttonTallMode.getY() + 36, (IntegrationMenu) menu));
     }
 
     @Inject(method = "render", at = @At("HEAD"))
@@ -41,5 +46,6 @@ public abstract class TerminalBackpackScreenMixin extends AbstractContainerScree
         sophisticatedIntegrations$backpacks.active = (mode & TerminalSession.BACKPACKS_ALLOWED) != 0;
         sophisticatedIntegrations$backpacks.setState((mode & TerminalSession.BACKPACKS_INCLUDED) != 0);
         sophisticatedIntegrations$backpacks.setPosition(buttonTallMode.getX(), buttonTallMode.getY() + 18);
+        sophisticatedIntegrations$resort.setPosition(buttonTallMode.getX(), buttonTallMode.getY() + 36);
     }
 }

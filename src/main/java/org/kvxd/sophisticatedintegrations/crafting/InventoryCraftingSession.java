@@ -9,6 +9,7 @@ import net.p3pp3rf1y.sophisticatedcore.settings.SettingsManager;
 import net.p3pp3rf1y.sophisticatedcore.upgrades.crafting.CraftingUpgradeWrapper;
 import org.kvxd.sophisticatedintegrations.config.IntegrationConfig;
 import org.kvxd.sophisticatedintegrations.network.InventoryCraftingAvailabilityPayload;
+import org.kvxd.sophisticatedintegrations.backpack.BackpackLocation;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,11 +20,13 @@ public final class InventoryCraftingSession {
     private boolean available;
     private boolean initialized;
     private List<NetworkIngredient> ingredients = List.of();
+    private List<NetworkIngredient> alternativeIngredients = List.of();
     private int revision;
     private int incomingRevision = -1;
     private int nextPart;
     private int incomingParts;
     private List<NetworkIngredient> incoming = new ArrayList<>();
+    private List<NetworkIngredient> incomingAlternative = new ArrayList<>();
 
     public boolean available() {
         return available;
@@ -33,12 +36,45 @@ public final class InventoryCraftingSession {
         return available ? ingredients : List.of();
     }
 
+    public List<NetworkIngredient> alternativeIngredients() {
+        return available ? alternativeIngredients : List.of();
+    }
+
     public void broadcast(ServerPlayer player) {
+        broadcast(player, false);
+    }
+
+    public void broadcast(ServerPlayer player, boolean force) {
         var location = !player.isSpectator() && IntegrationConfig.AUTO_OPEN_CRAFTING.get()
                 ? CraftingBackpackFinder.find(player).orElse(null) : null;
-        boolean enabled = location != null;
+        var terminal = !player.isSpectator() && IntegrationConfig.AUTO_OPEN_CRAFTING.get()
+                ? LinkedTerminalAccess.findCrafting(player) : null;
+        boolean enabled = terminal != null || location != null;
+        List<NetworkIngredient> backpack = backpackIngredients(player, location);
+        List<NetworkIngredient> latest = terminal != null ? TerminalRecipeTransfer.ingredients(player, terminal) : backpack;
+        List<NetworkIngredient> alternative = terminal != null ? backpack : List.of();
+        if (!force && initialized && enabled == available && BackpackCraftingSession.sameContents(ingredients, latest)
+                && BackpackCraftingSession.sameContents(alternativeIngredients, alternative)) return;
+        initialized = true;
+        available = enabled;
+        ingredients = latest;
+        alternativeIngredients = alternative;
+        revision++;
+        int primaryParts = Math.max(1, (latest.size() + 63) / 64);
+        int alternativeParts = (alternative.size() + 63) / 64;
+        int parts = primaryParts + alternativeParts;
+        for (int part = 0; part < parts; part++) {
+            boolean fallback = part >= primaryParts;
+            List<NetworkIngredient> source = fallback ? alternative : latest;
+            int sourcePart = fallback ? part - primaryParts : part;
+            PacketDistributor.sendToPlayer(player, new InventoryCraftingAvailabilityPayload(revision, part, parts, enabled, fallback,
+                    source.subList(Math.min(sourcePart * 64, source.size()), Math.min((sourcePart + 1) * 64, source.size()))));
+        }
+    }
+
+    public static List<NetworkIngredient> backpackIngredients(ServerPlayer player, BackpackLocation location) {
         Map<StoredItemStack, Long> contents = new LinkedHashMap<>();
-        if (enabled) {
+        if (location != null) {
             var wrapper = BackpackWrapper.fromStack(location.stack());
             var inventory = wrapper.getInventoryHandler();
             for (int slot = 0; slot < inventory.getSlots(); slot++) {
@@ -57,18 +93,8 @@ public final class InventoryCraftingSession {
             for (NetworkIngredient item : BackpackCraftingSession.snapshot(LinkedTerminalAccess.find(player)))
                 contents.merge(new StoredItemStack(item.template()), item.quantity(), Long::sum);
         }
-        List<NetworkIngredient> latest = contents.entrySet().stream()
+        return contents.entrySet().stream()
                 .map(entry -> new NetworkIngredient(entry.getKey().getStack().copyWithCount(1), entry.getValue())).toList();
-        if (initialized && enabled == available && BackpackCraftingSession.sameContents(ingredients, latest)) return;
-        initialized = true;
-        available = enabled;
-        ingredients = latest;
-        revision++;
-        int parts = Math.max(1, (latest.size() + 63) / 64);
-        for (int part = 0; part < parts; part++) {
-            PacketDistributor.sendToPlayer(player, new InventoryCraftingAvailabilityPayload(revision, part, parts, enabled,
-                    latest.subList(Math.min(part * 64, latest.size()), Math.min((part + 1) * 64, latest.size()))));
-        }
     }
 
     private static void add(Map<StoredItemStack, Long> contents, ItemStack stack) {
@@ -83,16 +109,19 @@ public final class InventoryCraftingSession {
             incomingParts = payload.parts();
             nextPart = 0;
             incoming = new ArrayList<>();
+            incomingAlternative = new ArrayList<>();
         }
         if (payload.revision() != incomingRevision || payload.parts() != incomingParts || payload.part() != nextPart)
             return;
-        incoming.addAll(payload.ingredients());
+        (payload.alternative() ? incomingAlternative : incoming).addAll(payload.ingredients());
         nextPart++;
         if (nextPart == incomingParts) {
             available = payload.available();
             ingredients = List.copyOf(incoming);
+            alternativeIngredients = List.copyOf(incomingAlternative);
             initialized = true;
             incoming.clear();
+            incomingAlternative.clear();
         }
     }
 }

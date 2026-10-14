@@ -2,5 +2,8 @@
   "gui.sophisticatedintegrations.backpacks": "Include backpack items",
   "gui.sophisticatedintegrations.backpacks.off": "Backpack items: off",
   "gui.sophisticatedintegrations.backpacks.on": "Backpack items: on",
-  "gui.sophisticatedintegrations.missing_ingredients": "Missing ingredients"
+  "gui.sophisticatedintegrations.missing_ingredients": "Missing ingredients",
+  "gui.sophisticatedintegrations.resort": "Re-sort storage",
+  "gui.sophisticatedintegrations.resort.tooltip": "Consolidate matching items across linked storage",
+  "gui.sophisticatedintegrations.resort.done": "Re-sorted storage: moved %s items"
 }

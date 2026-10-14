@@ -406,4 +406,63 @@ public final class TerminalIntegrationTests {
                 "A withdrawal must return one legal stack while preserving the remaining upgraded storage count");
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+    public static void terminalDepositsPreferExistingStacks(GameTestHelper helper) {
+        var terminal = terminal(helper, false);
+        var barrel = (Container) helper.getBlockEntity(BARREL);
+        barrel.setItem(1, new ItemStack(Items.DIAMOND, 12));
+        var input = new ItemStack(Items.DIAMOND, 5);
+        helper.assertTrue(terminal.pushStack(input).isEmpty() && input.getCount() == 5
+                && barrel.getItem(0).isEmpty() && barrel.getItem(1).getCount() == 17,
+                "Native terminal deposit must fill an existing stack before an earlier empty slot");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void resortButtonValidatesMenuAndLeavesBackpacksAlone(GameTestHelper helper) {
+        var terminal = terminal(helper, true);
+        var barrel = (Container) helper.getBlockEntity(BARREL);
+        barrel.setItem(0, new ItemStack(Items.DIAMOND, 12));
+        barrel.setItem(1, new ItemStack(Items.DIAMOND, 5));
+        var player = player(helper);
+        var backpack = backpack(player);
+        backpack.getInventoryHandler().setStackInSlot(0, new ItemStack(Items.DIAMOND, 3));
+        var menu = menu(player, terminal);
+        var message = new CompoundTag();
+        message.putBoolean("sophisticatedintegrations:resort", true);
+        message.putInt("sophisticatedintegrations:menu", 99);
+        menu.receive(message);
+        helper.assertTrue(barrel.getItem(1).getCount() == 5, "A stale re-sort request must be rejected");
+        message.putInt("sophisticatedintegrations:menu", menu.containerId);
+        menu.receive(message);
+        helper.assertTrue(barrel.getItem(0).getCount() == 17 && barrel.getItem(1).isEmpty()
+                && backpack.getInventoryHandler().getStackInSlot(0).getCount() == 3,
+                "The crafting terminal button must consolidate physical storage without depositing personal backpack items");
+        player.containerMenu = player.inventoryMenu;
+        barrel.setItem(0, new ItemStack(Items.DIAMOND, 12));
+        barrel.setItem(1, new ItemStack(Items.DIAMOND, 5));
+        menu.receive(message);
+        helper.assertTrue(barrel.getItem(1).getCount() == 5, "A closed menu must never re-sort its network");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void terminalOnlyOperationsKeepStorageConsolidated(GameTestHelper helper) {
+        var terminal = terminal(helper, false);
+        var barrel = (Container) helper.getBlockEntity(BARREL);
+        barrel.setItem(0, new ItemStack(Items.DIAMOND, 64));
+        barrel.setItem(1, new ItemStack(Items.DIAMOND, 5));
+        var network = ((org.kvxd.sophisticatedintegrations.storage.TerminalStorageAccess) terminal).sophisticatedIntegrations$networkStorage();
+        var withdrawn = terminal.pullStack(new StoredItemStack(new ItemStack(Items.DIAMOND)), 5);
+        helper.assertTrue(withdrawn.getQuantity() == 5 && barrel.getItem(0).getCount() == 64 && barrel.getItem(1).isEmpty(),
+                "Native terminal withdrawal must drain the partial overflow stack, not split the full stack");
+        for (int count : new int[]{12, 37, 5, 64, 1}) {
+            terminal.pushStack(new ItemStack(Items.DIAMOND, count));
+            terminal.pullStack(new StoredItemStack(new ItemStack(Items.DIAMOND)), Math.max(1, count / 2));
+            helper.assertTrue(org.kvxd.sophisticatedintegrations.storage.NetworkStorage.consolidate(network, helper.getLevel(), stack -> {}) == 0,
+                    "Terminal-only deposits and withdrawals must leave no redundant partial stacks");
+        }
+        helper.succeed();
+    }
 }

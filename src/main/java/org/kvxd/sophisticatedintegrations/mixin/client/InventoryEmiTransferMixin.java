@@ -11,6 +11,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.world.inventory.InventoryMenu;
 import org.kvxd.sophisticatedintegrations.client.InventoryCraftingBridge;
+import org.kvxd.sophisticatedintegrations.client.emi.InventoryEmiSnapshot;
+import org.kvxd.sophisticatedintegrations.crafting.NetworkIngredient;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -28,6 +30,22 @@ public abstract class InventoryEmiTransferMixin implements StandardRecipeHandler
     private InventoryMenu sophisticatedIntegrations$lastCraftableMenu;
     @Unique
     private EmiPlayerInventory sophisticatedIntegrations$localCraftableInventory;
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$lastAlternativeContextInventory;
+    @Unique
+    private InventoryMenu sophisticatedIntegrations$lastAlternativeMenu;
+    @Unique
+    private List<NetworkIngredient> sophisticatedIntegrations$lastAlternativeIngredients;
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$alternativeCraftableInventory;
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$lastPreferredContextInventory;
+    @Unique
+    private InventoryMenu sophisticatedIntegrations$lastPreferredMenu;
+    @Unique
+    private List<NetworkIngredient> sophisticatedIntegrations$lastPreferredIngredients;
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$preferredCraftableInventory;
 
     @Inject(method = "supportsRecipe", at = @At("HEAD"), cancellable = true)
     private void sophisticatedIntegrations$largeRecipe(EmiRecipe recipe, CallbackInfoReturnable<Boolean> ci) {
@@ -38,9 +56,50 @@ public abstract class InventoryEmiTransferMixin implements StandardRecipeHandler
     private void sophisticatedIntegrations$canOpen(EmiRecipe recipe, EmiCraftContext<InventoryMenu> context, CallbackInfoReturnable<Boolean> ci) {
         boolean backpack = InventoryCraftingBridge.canRoute(context.getScreenHandler(), recipe.getId());
         EmiPlayerInventory inventory = context.getType() == EmiCraftContext.Type.CRAFTABLE
-                ? backpack ? context.getInventory() : sophisticatedIntegrations$localSnapshot(context)
+                ? backpack ? sophisticatedIntegrations$preferredSnapshot(context) : sophisticatedIntegrations$localSnapshot(context)
                 : sophisticatedIntegrations$inventory(context.getScreen(), backpack);
-        ci.setReturnValue((backpack || supportsRecipe(recipe)) && inventory.canCraft(recipe));
+        if (!backpack && !supportsRecipe(recipe)) {
+            ci.setReturnValue(false);
+            return;
+        }
+        boolean craftable = inventory.canCraft(recipe);
+        if (!craftable && backpack) {
+            var alternative = sophisticatedIntegrations$alternativeSnapshot(context);
+            craftable = alternative != null && alternative.canCraft(recipe);
+        }
+        ci.setReturnValue(craftable);
+    }
+
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$preferredSnapshot(EmiCraftContext<InventoryMenu> context) {
+        if (context.getInventory() instanceof InventoryEmiSnapshot snapshot) return snapshot.preferred();
+        var ingredients = InventoryCraftingBridge.ingredients(context.getScreenHandler());
+        if (sophisticatedIntegrations$lastPreferredContextInventory != context.getInventory()
+                || sophisticatedIntegrations$lastPreferredMenu != context.getScreenHandler()
+                || sophisticatedIntegrations$lastPreferredIngredients != ingredients) {
+            sophisticatedIntegrations$lastPreferredContextInventory = context.getInventory();
+            sophisticatedIntegrations$lastPreferredMenu = context.getScreenHandler();
+            sophisticatedIntegrations$lastPreferredIngredients = ingredients;
+            sophisticatedIntegrations$preferredCraftableInventory = sophisticatedIntegrations$inventory(context.getScreen(), ingredients);
+        }
+        return sophisticatedIntegrations$preferredCraftableInventory;
+    }
+
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$alternativeSnapshot(EmiCraftContext<InventoryMenu> context) {
+        if (context.getType() == EmiCraftContext.Type.CRAFTABLE && context.getInventory() instanceof InventoryEmiSnapshot snapshot)
+            return snapshot.alternative();
+        var ingredients = InventoryCraftingBridge.alternativeIngredients(context.getScreenHandler());
+        if (ingredients.isEmpty()) return null;
+        if (sophisticatedIntegrations$lastAlternativeContextInventory != context.getInventory()
+                || sophisticatedIntegrations$lastAlternativeMenu != context.getScreenHandler()
+                || sophisticatedIntegrations$lastAlternativeIngredients != ingredients) {
+            sophisticatedIntegrations$lastAlternativeContextInventory = context.getInventory();
+            sophisticatedIntegrations$lastAlternativeMenu = context.getScreenHandler();
+            sophisticatedIntegrations$lastAlternativeIngredients = ingredients;
+            sophisticatedIntegrations$alternativeCraftableInventory = sophisticatedIntegrations$inventory(context.getScreen(), ingredients);
+        }
+        return sophisticatedIntegrations$alternativeCraftableInventory;
     }
 
     @Unique
@@ -63,19 +122,31 @@ public abstract class InventoryEmiTransferMixin implements StandardRecipeHandler
 
     @Override
     public EmiPlayerInventory getInventory(AbstractContainerScreen<InventoryMenu> screen) {
-        return sophisticatedIntegrations$inventory(screen, true);
+        var preferred = sophisticatedIntegrations$inventory(screen, true);
+        var alternative = InventoryCraftingBridge.alternativeIngredients(screen.getMenu());
+        return new InventoryEmiSnapshot(preferred,
+                alternative.isEmpty() ? null : sophisticatedIntegrations$inventory(screen, alternative));
     }
 
     private EmiPlayerInventory sophisticatedIntegrations$inventory(AbstractContainerScreen<InventoryMenu> screen, boolean backpacks) {
+        return sophisticatedIntegrations$inventory(screen, backpacks ? InventoryCraftingBridge.ingredients(screen.getMenu()) : List.of());
+    }
+
+    @Unique
+    private EmiPlayerInventory sophisticatedIntegrations$inventory(AbstractContainerScreen<InventoryMenu> screen, List<NetworkIngredient> ingredients) {
         var items = new ArrayList<>(getInputSources(screen.getMenu()).stream().map(slot -> EmiStack.of(slot.getItem())).toList());
-        if (backpacks) InventoryCraftingBridge.ingredients(screen.getMenu())
-                .forEach(item -> items.add(EmiStack.of(item.template(), item.quantity())));
+        ingredients.forEach(item -> items.add(EmiStack.of(item.template(), item.quantity())));
         return new EmiPlayerInventory(items);
     }
 
     private EmiCraftContext<InventoryMenu> sophisticatedIntegrations$freshContext(EmiRecipe recipe, EmiCraftContext<InventoryMenu> context) {
-        return new EmiCraftContext<>(context.getScreen(), sophisticatedIntegrations$inventory(context.getScreen(),
-                InventoryCraftingBridge.canRoute(context.getScreenHandler(), recipe.getId())), context.getType(), context.getDestination(), context.getAmount());
+        boolean routed = InventoryCraftingBridge.canRoute(context.getScreenHandler(), recipe.getId());
+        var inventory = sophisticatedIntegrations$inventory(context.getScreen(), routed);
+        if (routed && !inventory.canCraft(recipe)) {
+            var alternative = sophisticatedIntegrations$alternativeSnapshot(context);
+            if (alternative != null && alternative.canCraft(recipe)) inventory = alternative;
+        }
+        return new EmiCraftContext<>(context.getScreen(), inventory, context.getType(), context.getDestination(), context.getAmount());
     }
 
     @Override
@@ -85,7 +156,7 @@ public abstract class InventoryEmiTransferMixin implements StandardRecipeHandler
 
     @Override
     public boolean craft(EmiRecipe recipe, EmiCraftContext<InventoryMenu> context) {
-        if (!InventoryCraftingBridge.canRoute(context.getScreenHandler(), recipe.getId()))
+        if (!InventoryCraftingBridge.shouldOpen(context.getScreenHandler(), recipe.getId()))
             return StandardRecipeHandler.super.craft(recipe, context);
         if (!InventoryCraftingBridge.canFill(context.getScreenHandler(), recipe.getId())) return false;
         int action = switch (context.getDestination()) {

@@ -1,6 +1,8 @@
 package org.kvxd.sophisticatedintegrations.crafting;
 
 import com.tom.storagemod.block.entity.StorageTerminalBlockEntity;
+import com.tom.storagemod.inventory.StoredItemStack;
+import org.kvxd.sophisticatedintegrations.storage.TerminalStorageAccess;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -12,8 +14,12 @@ import org.kvxd.sophisticatedintegrations.network.BackpackNetworkPayload;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 public final class BackpackCraftingSession {
+    private static final Map<StorageTerminalBlockEntity, TerminalIngredientSnapshot> SNAPSHOTS = new WeakHashMap<>();
     private final Player player;
     private final StorageContainerMenuBase<?> menu;
     private List<NetworkIngredient> ingredients = List.of();
@@ -49,8 +55,17 @@ public final class BackpackCraftingSession {
 
     public static List<NetworkIngredient> snapshot(StorageTerminalBlockEntity terminal) {
         if (terminal == null) return List.of();
-        return terminal.getStacks().values().stream().filter(item -> item.getQuantity() > 0)
-                .map(item -> new NetworkIngredient(item.getStack().copyWithCount(1), item.getQuantity())).toList();
+        var tracker = ((TerminalStorageAccess) terminal).sophisticatedIntegrations$networkStorage().tracker();
+        long revision = tracker.getChangeTracker(terminal.getLevel());
+        var previous = SNAPSHOTS.get(terminal);
+        if (previous != null && previous.revision() == revision) return previous.ingredients();
+        Map<StoredItemStack, Long> contents = new LinkedHashMap<>();
+        tracker.streamWrappedStacks(false).filter(item -> item.getQuantity() > 0)
+                .forEach(item -> contents.merge(item, item.getQuantity(), Long::sum));
+        List<NetworkIngredient> ingredients = contents.entrySet().stream()
+                .map(entry -> new NetworkIngredient(entry.getKey().getStack().copyWithCount(1), entry.getValue())).toList();
+        SNAPSHOTS.put(terminal, new TerminalIngredientSnapshot(revision, ingredients));
+        return ingredients;
     }
 
     public void broadcast() {

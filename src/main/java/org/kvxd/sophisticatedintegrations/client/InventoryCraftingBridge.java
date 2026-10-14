@@ -4,19 +4,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.kvxd.sophisticatedintegrations.crafting.InventoryCraftingAccess;
 import org.kvxd.sophisticatedintegrations.crafting.InventoryRecipeRouting;
 import org.kvxd.sophisticatedintegrations.crafting.NetworkIngredient;
-import org.kvxd.sophisticatedintegrations.crafting.RecipeIngredientPlanner;
 import org.kvxd.sophisticatedintegrations.network.InventoryBackpackRecipePayload;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public final class InventoryCraftingBridge {
+
+    private static final InventoryRecipePreview PREVIEW = new InventoryRecipePreview();
+
     private InventoryCraftingBridge() {
     }
 
@@ -26,7 +26,7 @@ public final class InventoryCraftingBridge {
                 || player.containerMenu != menu || !((InventoryCraftingAccess) menu).sophisticatedIntegrations$hasCraftingBackpack())
             return false;
         var holder = player.level().getRecipeManager().byKey(recipeId).orElse(null);
-        return holder != null && holder.value() instanceof CraftingRecipe recipe && InventoryRecipeRouting.needsBackpack(recipe);
+        return holder != null && holder.value() instanceof CraftingRecipe recipe && InventoryRecipeRouting.supportsBackpack(recipe);
     }
 
     public static boolean canRoute(ResourceLocation recipeId) {
@@ -38,19 +38,23 @@ public final class InventoryCraftingBridge {
         return ((InventoryCraftingAccess) menu).sophisticatedIntegrations$inventoryCraftingSession().ingredients();
     }
 
+    public static List<NetworkIngredient> alternativeIngredients(InventoryMenu menu) {
+        return ((InventoryCraftingAccess) menu).sophisticatedIntegrations$inventoryCraftingSession().alternativeIngredients();
+    }
+
     public static boolean canFill(InventoryMenu menu, ResourceLocation recipeId) {
         if (!canRoute(menu, recipeId)) return false;
         var player = Minecraft.getInstance().player;
         var holder = player.level().getRecipeManager().byKey(recipeId).orElseThrow();
-        List<NetworkIngredient> available = new ArrayList<>(ingredients(menu));
-        for (int slot = 1; slot <= 4; slot++) add(available, menu.getSlot(slot).getItem());
-        for (int slot = 9; slot < 45; slot++) add(available, menu.getSlot(slot).getItem());
-        add(available, menu.getCarried());
-        return RecipeIngredientPlanner.plan(player, (CraftingRecipe) holder.value(), available).isPresent();
+        return PREVIEW.canFillAny(player, menu, (CraftingRecipe) holder.value(), ingredients(menu), alternativeIngredients(menu));
     }
 
-    private static void add(List<NetworkIngredient> available, ItemStack stack) {
-        if (!stack.isEmpty()) available.add(new NetworkIngredient(stack.copyWithCount(1), stack.getCount()));
+    public static boolean shouldOpen(InventoryMenu menu, ResourceLocation recipeId) {
+        if (!canRoute(menu, recipeId)) return false;
+        var player = Minecraft.getInstance().player;
+        var recipe = (CraftingRecipe) player.level().getRecipeManager().byKey(recipeId).orElseThrow().value();
+        return InventoryRecipeRouting.needsBackpack(recipe)
+                || !PREVIEW.canFill(player, menu, recipe, ingredients(menu), true);
     }
 
     public static void route(InventoryMenu menu, ResourceLocation recipeId, boolean maxTransfer, int action) {

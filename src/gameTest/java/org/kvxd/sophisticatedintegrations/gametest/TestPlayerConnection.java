@@ -1,5 +1,6 @@
 package org.kvxd.sophisticatedintegrations.gametest;
 
+import io.netty.channel.embedded.EmbeddedChannel;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
@@ -14,7 +15,13 @@ public final class TestPlayerConnection extends ServerGamePacketListenerImpl {
     private final List<Packet<?>> packets = new ArrayList<>();
 
     public TestPlayerConnection(ServerPlayer player, CommonListenerCookie cookie) {
-        super(player.server, new Connection(PacketFlow.SERVERBOUND), player, cookie);
+        super(player.server, connected(), player, cookie);
+    }
+
+    private static Connection connected() {
+        var connection = new Connection(PacketFlow.SERVERBOUND);
+        new EmbeddedChannel(connection);
+        return connection;
     }
 
     @Override

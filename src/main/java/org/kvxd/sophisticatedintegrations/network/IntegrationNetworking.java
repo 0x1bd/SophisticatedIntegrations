@@ -14,7 +14,12 @@ public final class IntegrationNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("2");
+        var registrar = event.registrar("4");
+        registrar.playToServer(InventoryCraftingRefreshPayload.TYPE, InventoryCraftingRefreshPayload.STREAM_CODEC, (payload, context) -> {
+            if (context.player() instanceof ServerPlayer player && player.containerMenu == player.inventoryMenu
+                    && player.inventoryMenu.containerId == payload.containerId())
+                ((InventoryCraftingAccess) player.inventoryMenu).sophisticatedIntegrations$inventoryCraftingSession().broadcast(player, true);
+        });
         registrar.playToClient(BackpackNetworkPayload.TYPE, BackpackNetworkPayload.STREAM_CODEC, (payload, context) -> {
             if (context.player().containerMenu instanceof BackpackCraftingMenu menu)
                 menu.sophisticatedIntegrations$craftingSession().receive(payload);

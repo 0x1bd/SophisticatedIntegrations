@@ -11,7 +11,17 @@ import java.util.Set;
 public final class IntegrationMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        String mod = mixinClassName.endsWith("JeiTransferMixin") ? "jei"
+        if (mixinClassName.endsWith("InventoryJeiContextTransferMixin")) {
+            try {
+                org.spongepowered.asm.service.MixinService.getService().getBytecodeProvider()
+                        .getClassNode("mezz.jei.api.recipe.transfer.IRecipeTransferContext", true);
+            } catch (ClassNotFoundException | java.io.IOException unavailable) {
+                return false;
+            }
+        }
+        String mod = mixinClassName.endsWith("ContraptionTerminalMixin") ? "createcontraptionterminals"
+                : mixinClassName.endsWith("ContentsFilteredInventoryAccessor") ? "sophisticatedstorage"
+                : mixinClassName.endsWith("JeiTransferMixin") || mixinClassName.endsWith("JeiContextTransferMixin") ? "jei"
                 : mixinClassName.endsWith("EmiTransferMixin") ? "emi"
                   : mixinClassName.endsWith("ReiTransferMixin") ? "roughlyenoughitems" : null;
         return mod == null || FMLLoader.getLoadingModList().getModFileById(mod) != null;

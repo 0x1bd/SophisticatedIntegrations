@@ -7,6 +7,10 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import org.kvxd.sophisticatedintegrations.backpack.BackpackInventories;
 import org.kvxd.sophisticatedintegrations.config.IntegrationConfig;
+import org.kvxd.sophisticatedintegrations.storage.NetworkStorage;
+import org.kvxd.sophisticatedintegrations.storage.TerminalStorageAccess;
+import org.kvxd.sophisticatedintegrations.storage.StorageMaintenance;
+import net.minecraft.network.chat.Component;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +23,22 @@ public final class TerminalSession {
     private final StorageTerminalBlockEntity terminal;
     private Map<StoredItemStack, TerminalItemStack> previous;
     private int revision;
+    private long nextResort;
+
+    public void resort() {
+        if (terminal == null || player.level().isClientSide || player.isSpectator()
+                || !(player.containerMenu instanceof IntegrationMenu menu)
+                || menu.sophisticatedIntegrations$getSession() != this || !terminal.canInteractWith(player, true)) return;
+        long now = player.level().getGameTime();
+        if (now < nextResort) return;
+        nextResort = now + 20;
+        long moved = NetworkStorage.consolidate(((TerminalStorageAccess) terminal).sophisticatedIntegrations$networkStorage(),
+                terminal.getLevel(), stack -> player.getInventory().placeItemBackInInventory(stack));
+        if (moved > 0) StorageMaintenance.schedule(terminal);
+        terminal.getStacks();
+        terminal.updateServer();
+        player.displayClientMessage(Component.translatable("gui.sophisticatedintegrations.resort.done", moved), true);
+    }
 
     public TerminalSession(Player player, StorageTerminalBlockEntity terminal) {
         this.player = player;

@@ -23,11 +23,14 @@ public abstract class InventoryReiTransferMixin {
         var recipeId = context.getDisplay().getDisplayLocation().orElse(null);
         if (!(context.getMenu() instanceof InventoryMenu menu) || !InventoryCraftingBridge.canRoute(menu, recipeId))
             return;
+        if (!InventoryCraftingBridge.shouldOpen(menu, recipeId)) return;
         if (!InventoryCraftingBridge.canFill(menu, recipeId)) {
             ci.setReturnValue(TransferHandler.Result.createFailed(Component.translatable("gui.sophisticatedintegrations.missing_ingredients")));
             return;
         }
-        if (context.isActuallyCrafting()) InventoryCraftingBridge.route(menu, recipeId, context.isStackedCrafting(), 0);
+        if (context.isActuallyCrafting()) {
+            InventoryCraftingBridge.route(menu, recipeId, context.isStackedCrafting(), 0);
+        }
         ci.setReturnValue(TransferHandler.Result.createSuccessful());
     }
 }
