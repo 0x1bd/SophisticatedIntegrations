@@ -25,7 +25,7 @@ public record StorageSlot(InventorySlot slot, int priority, boolean filtered, in
         if (!stored.isEmpty() && !matches(template)) return 0;
         int probe = Math.max(0, handler().getSlotLimit(index()));
         if (probe == 0) return 0;
-        return probe - handler().insertItem(index(), template.copyWithCount(probe), true).getCount();
+        return probe - insert(template.copyWithCount(probe), true).getCount();
     }
 
     public int consolidationSpace(ItemStack template) {
@@ -33,16 +33,22 @@ public record StorageSlot(InventorySlot slot, int priority, boolean filtered, in
     }
 
     public ItemStack insert(ItemStack input) {
+        return insert(input, false);
+    }
+
+    public ItemStack insert(ItemStack input, boolean simulate) {
         var backing = StorageSafety.physicalSlot(handler(), index());
         if (backing == null) return input;
-        if (StorageSafety.mayVoid(handler(), index(), input)) return slot.insert(input);
-        if (!(backing.handler() instanceof InventoryHandler inventory)) return slot.insert(input);
+        if (StorageSafety.mayVoid(handler(), index(), input) || !(backing.handler() instanceof InventoryHandler inventory))
+            return simulate ? handler().insertItem(index(), input, true) : slot.insert(input);
         int accepted = input.getCount() - handler().insertItem(index(), input.copy(), true).getCount();
         if (accepted <= 0) return input;
         ItemStack remainder = input.copy();
-        ItemStack uninserted = inventory.insertItemOnlyToSlot(backing.index(), input.copyWithCount(accepted), false);
+        // The normal Sophisticated insertion simulation may accept into other slots.
+        // Both capacity probes and real moves must use the selected physical slot.
+        ItemStack uninserted = inventory.insertItemOnlyToSlot(backing.index(), input.copyWithCount(accepted), simulate);
         remainder.shrink(accepted - uninserted.getCount());
-        if (remainder.getCount() < input.getCount())
+        if (!simulate && remainder.getCount() < input.getCount())
             ((InventorySlotAccessor) slot).sophisticatedIntegrations$notifier().onSlotChanged(slot);
         return remainder;
     }

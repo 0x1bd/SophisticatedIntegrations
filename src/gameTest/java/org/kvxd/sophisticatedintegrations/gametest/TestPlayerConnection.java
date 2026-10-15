@@ -2,6 +2,7 @@ package org.kvxd.sophisticatedintegrations.gametest;
 
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.minecraft.network.Connection;
+import net.minecraft.network.PacketSendListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
@@ -26,6 +27,11 @@ public final class TestPlayerConnection extends ServerGamePacketListenerImpl {
 
     @Override
     public void send(Packet<?> packet) {
+        packets.add(packet);
+    }
+
+    @Override
+    public void send(Packet<?> packet, PacketSendListener listener) {
         packets.add(packet);
     }
 

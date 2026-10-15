@@ -6,7 +6,7 @@ An addon for Minecraft that connects **Tom's Simple Storage** terminals to **Sop
 
 - Carried and equipped backpacks join the terminal's item list
 - Withdrawals use the network first, then the viewer's backpacks. Deposits use the network first and put any remainder in accepting backpacks. Full inventories return the remainder.
-- The **Re-sort storage** button below the backpack toggle consolidates matching items across the linked physical storage. Personal backpacks and crafting grids are not re-sorted.
+- The **Re-sort storage** button below the backpack toggle consolidates matching items across the linked physical storage, using upgraded stack capacities. It shows **Re-sorting storage...** while working and reports completion after all required passes finish. Personal backpacks and crafting grids are not re-sorted.
 - Deposits fill matching stacks while respecting configured priorities and item filters. Withdrawals drain overflow first, keeping terminal-managed storage consolidated automatically. Re-sort is useful for existing scattered stock or changes made outside the terminal.
 
 ## Recipe viewers

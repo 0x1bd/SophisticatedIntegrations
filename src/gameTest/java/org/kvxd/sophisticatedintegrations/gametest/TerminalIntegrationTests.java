@@ -17,7 +17,9 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.Container;
@@ -26,6 +28,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.items.ItemStackHandler;
 import net.p3pp3rf1y.sophisticatedbackpacks.backpack.wrapper.BackpackWrapper;
 import net.p3pp3rf1y.sophisticatedbackpacks.backpack.wrapper.IBackpackWrapper;
 import net.p3pp3rf1y.sophisticatedbackpacks.init.ModItems;
@@ -36,6 +40,8 @@ import org.kvxd.sophisticatedintegrations.backpack.BackpackInventories;
 import org.kvxd.sophisticatedintegrations.terminal.IntegrationMenu;
 import org.kvxd.sophisticatedintegrations.terminal.TerminalContext;
 import org.kvxd.sophisticatedintegrations.terminal.TerminalSession;
+import org.kvxd.sophisticatedintegrations.storage.NetworkStorage;
+import org.kvxd.sophisticatedintegrations.storage.StorageMaintenance;
 
 import java.util.Map;
 import java.util.UUID;
@@ -436,6 +442,8 @@ public final class TerminalIntegrationTests {
         helper.assertTrue(barrel.getItem(1).getCount() == 5, "A stale re-sort request must be rejected");
         message.putInt("sophisticatedintegrations:menu", menu.containerId);
         menu.receive(message);
+        var tick = new ServerTickEvent.Post(() -> true, helper.getLevel().getServer());
+        for (int i = 0; i < 20; i++) StorageMaintenance.tick(tick);
         helper.assertTrue(barrel.getItem(0).getCount() == 17 && barrel.getItem(1).isEmpty()
                 && backpack.getInventoryHandler().getStackInSlot(0).getCount() == 3,
                 "The crafting terminal button must consolidate physical storage without depositing personal backpack items");
@@ -444,6 +452,71 @@ public final class TerminalIntegrationTests {
         barrel.setItem(1, new ItemStack(Items.DIAMOND, 5));
         menu.receive(message);
         helper.assertTrue(barrel.getItem(1).getCount() == 5, "A closed menu must never re-sort its network");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void resortReportsCompletionOnlyAfterStorageIsStable(GameTestHelper helper) {
+        var vanilla = new ItemStackHandler(4);
+        for (int slot = 0; slot < 3; slot++) vanilla.setStackInSlot(slot, new ItemStack(Items.DIAMOND, 64));
+        vanilla.setStackInSlot(3, new ItemStack(Items.DIAMOND, 8));
+        var upgraded = new ItemStackHandler(2) {
+            @Override public int getSlotLimit(int slot) { return 512; }
+            @Override protected int getStackLimit(int slot, ItemStack stack) { return 512; }
+        };
+        upgraded.setStackInSlot(0, new ItemStack(Items.GOLD_INGOT));
+        upgraded.setStackInSlot(1, new ItemStack(Items.GOLD_INGOT));
+        var network = new TestStorageNetwork(new TestStorageInventory(vanilla), new TestStorageInventory(upgraded));
+        helper.setBlock(TERMINAL, Content.terminal.get());
+        var terminal = new TestStorageTerminal(helper.absolutePos(TERMINAL), helper.getBlockState(TERMINAL), network);
+        helper.getLevel().setBlockEntity(terminal);
+        var player = player(helper);
+        var menu = menu(player, terminal);
+        var message = new CompoundTag();
+        message.putBoolean("sophisticatedintegrations:resort", true);
+        message.putInt("sophisticatedintegrations:menu", menu.containerId);
+        menu.receive(message);
+        menu.receive(message); // Duplicate requests must share one running sort.
+        helper.assertTrue(resortMessages(player, "started").size() == 1 && resortMessages(player, "done").isEmpty(),
+                "A queued re-sort must announce progress without reporting premature completion; access="
+                        + session(menu).canAccess() + ", packets=" + ((TestPlayerConnection) player.connection).packets());
+        var tick = new ServerTickEvent.Post(() -> true, helper.getLevel().getServer());
+        StorageMaintenance.tick(tick); // Snapshot.
+        StorageMaintenance.tick(tick); // First item; more work still remains.
+        helper.assertTrue(resortMessages(player, "done").isEmpty(), "Completion must wait for every item and repeat pass");
+        for (int i = 0; i < 20; i++) StorageMaintenance.tick(tick);
+        var completed = resortMessages(player, "done");
+        helper.assertTrue(completed.size() == 1, "The stable re-sort must report completion exactly once");
+        var contents = (TranslatableContents) completed.getFirst().content().getContents();
+        helper.assertTrue(((Number) contents.getArgs()[0]).longValue() == 201,
+                "Completion must include all 201 moves across the passes");
+        helper.assertTrue(upgraded.getStackInSlot(0).getCount() + upgraded.getStackInSlot(1).getCount() == 202
+                && vanilla.getStackInSlot(0).isEmpty() && vanilla.getStackInSlot(3).isEmpty()
+                && NetworkStorage.consolidate(network, helper.getLevel(), stack -> {}) == 0,
+                "Reported completion must mean gold has freed the upgraded space and all diamonds are consolidated");
+        helper.succeed();
+    }
+
+    private static java.util.List<ClientboundSystemChatPacket> resortMessages(ServerPlayer player, String state) {
+        return ((TestPlayerConnection) player.connection).packets().stream()
+                .filter(ClientboundSystemChatPacket.class::isInstance).map(ClientboundSystemChatPacket.class::cast)
+                .filter(packet -> packet.content().getContents() instanceof TranslatableContents contents
+                        && contents.getKey().equals("gui.sophisticatedintegrations.resort." + state)).toList();
+    }
+
+    @GameTest(template = "empty")
+    public static void removedTerminalDoesNotReportResortCompletion(GameTestHelper helper) {
+        var terminal = terminal(helper, false);
+        var barrel = (Container) helper.getBlockEntity(BARREL);
+        barrel.setItem(0, new ItemStack(Items.DIAMOND, 12));
+        barrel.setItem(1, new ItemStack(Items.DIAMOND, 5));
+        var player = player(helper);
+        var menu = menu(player, terminal);
+        session(menu).resort();
+        helper.setBlock(TERMINAL, Blocks.AIR);
+        StorageMaintenance.tick(new ServerTickEvent.Post(() -> true, helper.getLevel().getServer()));
+        helper.assertTrue(resortMessages(player, "done").isEmpty() && barrel.getItem(1).getCount() == 5,
+                "An invalidated terminal must cancel its queued sort without announcing success or moving stock");
         helper.succeed();
     }
 

@@ -13,6 +13,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import com.tom.storagemod.util.Priority;
 import net.p3pp3rf1y.sophisticatedcore.api.IStorageWrapper;
 import net.p3pp3rf1y.sophisticatedcore.controller.ControllerBlockEntityBase;
 import net.p3pp3rf1y.sophisticatedcore.controller.IControllableStorage;
@@ -49,6 +50,32 @@ public final class StoragePackCompatibilityTests {
         NetworkStorage.consolidate(access, helper.getLevel(), stack -> { throw new AssertionError("Unexpected recovery"); });
         helper.assertTrue(inventory.getStackInSlot(0).getCount() == 16 && inventory.getStackInSlot(1).getCount() == 64,
                 "Actual chest input/output must consolidate into the selected slot");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void upgradedSophisticatedChestDrainsLargeSourcesIntoOneSlot(GameTestHelper helper) {
+        if (!installed(helper)) return;
+        var source = chest(helper, BlockPos.ZERO);
+        var target = chest(helper, new BlockPos(1, 0, 0));
+        var sourceInventory = source.getInventoryHandler();
+        var targetInventory = target.getInventoryHandler();
+        var upgrade = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("sophisticatedstorage", "stack_upgrade_tier_3"));
+        source.getUpgradeHandler().setStackInSlot(0, new ItemStack(upgrade));
+        target.getUpgradeHandler().setStackInSlot(0, new ItemStack(upgrade));
+        helper.assertTrue(sourceInventory.getSlotLimit(0) >= 350 && targetInventory.getSlotLimit(0) >= 350,
+                "Real storage stack upgrades must be active");
+        sourceInventory.setStackInSlot(0, new ItemStack(Items.DIAMOND, 200));
+        sourceInventory.setStackInSlot(1, new ItemStack(Items.DIAMOND, 150));
+        var network = new TestStorageNetwork(new TestStorageInventory(source.getInventoryForInputOutput()),
+                new TestStorageInventory(target.getInventoryForInputOutput(), Priority.HIGH));
+        long moved = NetworkStorage.consolidate(network, helper.getLevel(), stack -> { throw new AssertionError("Unexpected recovery"); });
+        helper.assertTrue(moved == 350 && targetInventory.getStackInSlot(0).getCount() == 350
+                && targetInventory.getStackInSlot(1).isEmpty()
+                && sourceInventory.getStackInSlot(0).isEmpty() && sourceInventory.getStackInSlot(1).isEmpty(),
+                "Actual upgraded chests must consolidate large sources into one slot in one pass, moved=" + moved);
+        helper.assertTrue(NetworkStorage.consolidate(network, helper.getLevel(), stack -> {}) == 0,
+                "Actual upgraded chest consolidation must be stable");
         helper.succeed();
     }
 
@@ -96,6 +123,28 @@ public final class StoragePackCompatibilityTests {
                 "Controller insertion must target the selected backing slot");
         helper.assertTrue(NetworkStorage.consolidate(access, helper.getLevel(), stack -> { throw new AssertionError("Unexpected recovery"); }) == 0,
                 "Controller-backed maintenance must converge");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void upgradedSophisticatedControllerCombinesLargeStacks(GameTestHelper helper) {
+        if (!installed(helper)) return;
+        helper.setBlock(BlockPos.ZERO, BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("sophisticatedstorage", "controller")));
+        var controller = (ControllerBlockEntityBase) helper.getBlockEntity(BlockPos.ZERO);
+        var wrapper = chest(helper, new BlockPos(1, 0, 0));
+        var inventory = wrapper.getInventoryHandler();
+        var upgrade = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("sophisticatedstorage", "stack_upgrade_tier_3"));
+        wrapper.getUpgradeHandler().setStackInSlot(0, new ItemStack(upgrade));
+        inventory.setStackInSlot(0, new ItemStack(Items.DIAMOND, 200));
+        inventory.setStackInSlot(1, new ItemStack(Items.DIAMOND, 150));
+        controller.addStorage(helper.absolutePos(new BlockPos(1, 0, 0)));
+        var io = helper.getLevel().getCapability(Capabilities.ItemHandler.BLOCK, helper.absolutePos(BlockPos.ZERO), null);
+        var access = new TestStorageInventory(io);
+        NetworkStorage.consolidate(access, helper.getLevel(), stack -> { throw new AssertionError("Unexpected recovery"); });
+        helper.assertTrue(inventory.getStackInSlot(0).getCount() == 350 && inventory.getStackInSlot(1).isEmpty(),
+                "Controller access must repeatedly extract into the same upgraded backing slot");
+        helper.assertTrue(NetworkStorage.consolidate(access, helper.getLevel(), stack -> {}) == 0,
+                "Upgraded controller consolidation must be stable");
         helper.succeed();
     }
 }

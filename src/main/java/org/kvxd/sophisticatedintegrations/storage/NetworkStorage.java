@@ -136,24 +136,29 @@ public final class NetworkStorage {
                 if (sources.isEmpty() || sources.getLast() <= destination) break;
                 StorageSlot to = ranked.get(destination);
                 for (int source = sources.size() - 1; source >= 0 && sources.get(source) > destination; source--) {
-                    int space = to.consolidationSpace(template);
-                    if (space <= 0) break;
                     StorageSlot from = ranked.get(sources.get(source));
-                    if (!from.matches(template) || from.sameBackingSlot(to))
-                        continue;
-                    int amount = Math.min(space, from.slot().getStack().getCount());
-                    ItemStack simulated = from.handler().extractItem(from.index(), amount, true);
-                    if (simulated.isEmpty() || !ItemStack.isSameItemSameComponents(template, simulated)) continue;
-                    int accepted = simulated.getCount() - to.handler().insertItem(to.index(), simulated.copy(), true).getCount();
-                    if (accepted <= 0) continue;
-                    ItemStack extracted = from.slot().extract(accepted);
-                    if (extracted.isEmpty()) continue;
-                    ItemStack remainder = to.insert(extracted);
-                    moved += extracted.getCount() - remainder.getCount();
-                    if (!remainder.isEmpty()) {
-                        if (!StorageSafety.mayVoid(from.handler(), from.index(), remainder)) remainder = from.insert(remainder);
-                        if (!remainder.isEmpty()) recovery.accept(remainder);
+                    if (from.sameBackingSlot(to)) continue;
+                    // Sophisticated handlers can extract only one vanilla stack per call.
+                    // Drain that source before advancing to another destination slot.
+                    while (from.matches(template)) {
+                        int space = to.consolidationSpace(template);
+                        if (space <= 0) break;
+                        int amount = Math.min(space, from.slot().getStack().getCount());
+                        ItemStack simulated = from.handler().extractItem(from.index(), amount, true);
+                        if (simulated.isEmpty() || !ItemStack.isSameItemSameComponents(template, simulated)) break;
+                        int accepted = simulated.getCount() - to.insert(simulated.copy(), true).getCount();
+                        if (accepted <= 0) break;
+                        ItemStack extracted = from.slot().extract(accepted);
+                        if (extracted.isEmpty()) break;
+                        ItemStack remainder = to.insert(extracted);
+                        moved += extracted.getCount() - remainder.getCount();
+                        if (!remainder.isEmpty()) {
+                            if (!StorageSafety.mayVoid(from.handler(), from.index(), remainder)) remainder = from.insert(remainder);
+                            if (!remainder.isEmpty()) recovery.accept(remainder);
+                            break;
+                        }
                     }
+                    if (to.consolidationSpace(template) <= 0) break;
                 }
             }
         }

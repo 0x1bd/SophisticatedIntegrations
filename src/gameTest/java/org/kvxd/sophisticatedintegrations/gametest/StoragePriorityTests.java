@@ -132,6 +132,32 @@ public final class StoragePriorityTests {
     }
 
     @GameTest(template = "empty")
+    public static void resortDrainsUpgradedSourcesWithoutSplittingIntoVanillaStacks(GameTestHelper helper) {
+        var source = BackpackWrapper.fromStack(new ItemStack(ModItems.BACKPACK.get()));
+        var target = BackpackWrapper.fromStack(new ItemStack(ModItems.BACKPACK.get()));
+        var sourceInventory = source.getInventoryHandler();
+        var targetInventory = target.getInventoryHandler();
+        source.getUpgradeHandler().setStackInSlot(0, new ItemStack(ModItems.STACK_UPGRADE_TIER_3.get()));
+        target.getUpgradeHandler().setStackInSlot(0, new ItemStack(ModItems.STACK_UPGRADE_TIER_3.get()));
+        sourceInventory.setStackInSlot(0, new ItemStack(Items.DIAMOND, 200));
+        sourceInventory.setStackInSlot(1, new ItemStack(Items.DIAMOND, 150));
+        var network = new TestStorageNetwork(new TestStorageInventory(source.getInventoryForInputOutput()),
+                new TestStorageInventory(target.getInventoryForInputOutput(), Priority.HIGH));
+        long moved = NetworkStorage.consolidate(network, helper.getLevel(), stack -> {
+            throw new AssertionError("Unexpected recovery: " + stack);
+        });
+        helper.assertTrue(moved == 350 && targetInventory.getStackInSlot(0).getCount() == 350,
+                "One pass must drain extraction-limited upgraded sources into one upgraded destination, moved=" + moved);
+        helper.assertTrue(sourceInventory.getStackInSlot(0).isEmpty()
+                && sourceInventory.getStackInSlot(1).isEmpty()
+                && targetInventory.getStackInSlot(1).isEmpty(),
+                "Upgraded stock must not be scattered into sixty-four-item chunks");
+        helper.assertTrue(NetworkStorage.consolidate(network, helper.getLevel(), stack -> {}) == 0,
+                "A completed upgraded re-sort must be stable");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void resortDoesNotFeedExistingItemsIntoVoidUpgrades(GameTestHelper helper) {
         var vanilla = new ItemStackHandler(1);
         vanilla.setStackInSlot(0, new ItemStack(Items.COBBLESTONE, 17));

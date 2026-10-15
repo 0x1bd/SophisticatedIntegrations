@@ -7,9 +7,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import org.kvxd.sophisticatedintegrations.backpack.BackpackInventories;
 import org.kvxd.sophisticatedintegrations.config.IntegrationConfig;
-import org.kvxd.sophisticatedintegrations.storage.NetworkStorage;
-import org.kvxd.sophisticatedintegrations.storage.TerminalStorageAccess;
 import org.kvxd.sophisticatedintegrations.storage.StorageMaintenance;
+import org.kvxd.sophisticatedintegrations.storage.StorageMaintenanceJob;
 import net.minecraft.network.chat.Component;
 
 import java.util.HashMap;
@@ -24,20 +23,20 @@ public final class TerminalSession {
     private Map<StoredItemStack, TerminalItemStack> previous;
     private int revision;
     private long nextResort;
+    private StorageMaintenanceJob resortJob;
 
     public void resort() {
-        if (terminal == null || player.level().isClientSide || player.isSpectator()
-                || !(player.containerMenu instanceof IntegrationMenu menu)
-                || menu.sophisticatedIntegrations$getSession() != this || !terminal.canInteractWith(player, true)) return;
+        if (!canUseTerminal()) return;
         long now = player.level().getGameTime();
-        if (now < nextResort) return;
+        if (now < nextResort || resortJob != null && !resortJob.finished()) return;
         nextResort = now + 20;
-        long moved = NetworkStorage.consolidate(((TerminalStorageAccess) terminal).sophisticatedIntegrations$networkStorage(),
-                terminal.getLevel(), stack -> player.getInventory().placeItemBackInInventory(stack));
-        if (moved > 0) StorageMaintenance.schedule(terminal);
-        terminal.getStacks();
-        terminal.updateServer();
-        player.displayClientMessage(Component.translatable("gui.sophisticatedintegrations.resort.done", moved), true);
+        player.displayClientMessage(Component.translatable("gui.sophisticatedintegrations.resort.started"), true);
+        resortJob = StorageMaintenance.schedule(terminal, moved -> {
+            terminal.getStacks();
+            terminal.updateServer();
+            if (canUseTerminal())
+                player.displayClientMessage(Component.translatable("gui.sophisticatedintegrations.resort.done", moved), true);
+        });
     }
 
     public TerminalSession(Player player, StorageTerminalBlockEntity terminal) {
@@ -69,9 +68,13 @@ public final class TerminalSession {
     }
 
     public boolean canAccess() {
+        return IntegrationConfig.ENABLED.get() && canUseTerminal();
+    }
+
+    private boolean canUseTerminal() {
         return terminal != null && !player.level().isClientSide && !player.isSpectator()
                 && player.containerMenu instanceof IntegrationMenu menu && menu.sophisticatedIntegrations$getSession() == this
-                && IntegrationConfig.ENABLED.get() && terminal.canInteractWith(player, true);
+                && terminal.canInteractWith(player, true);
     }
 
     public Map<StoredItemStack, TerminalItemStack> merge(Map<StoredItemStack, TerminalItemStack> network) {

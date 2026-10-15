@@ -8,6 +8,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.function.LongConsumer;
 
 public final class StorageMaintenance {
 
@@ -16,15 +17,22 @@ public final class StorageMaintenance {
 
     private StorageMaintenance() {}
 
-    public static void schedule(StorageTerminalBlockEntity terminal) {
+    public static StorageMaintenanceJob schedule(StorageTerminalBlockEntity terminal) {
         var previous = PENDING.get(terminal);
-        if (previous != null) {
+        if (previous != null && !previous.finished()) {
             previous.requestPass();
-            return;
+            return previous;
         }
         var job = new StorageMaintenanceJob(terminal);
         PENDING.put(terminal, job);
         JOBS.addLast(job);
+        return job;
+    }
+
+    public static StorageMaintenanceJob schedule(StorageTerminalBlockEntity terminal, LongConsumer completed) {
+        var job = schedule(terminal);
+        job.whenFinished(completed);
+        return job;
     }
 
     public static void tick(ServerTickEvent.Post event) {
@@ -33,7 +41,7 @@ public final class StorageMaintenance {
         while (count-- > 0 && !JOBS.isEmpty()) {
             var job = JOBS.removeFirst();
             if (job.step(event.getServer())) JOBS.addLast(job);
-            else PENDING.remove(job.terminal());
+            else PENDING.remove(job.terminal(), job);
             if (System.nanoTime() >= deadline) break;
         }
     }
